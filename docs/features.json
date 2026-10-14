@@ -1,0 +1,237 @@
+{
+  "project": "multimodal-search-for-android",
+  "last_updated": "2026-10-14",
+  "summary": {
+    "total": 12,
+    "completed": 0,
+    "in_progress": 0,
+    "planned": 12,
+    "tests_passing": 0,
+    "tests_failing": 0,
+    "tests_missing": 12
+  },
+  "features": [
+    {
+      "id": "F001",
+      "name": "Crawler + sync",
+      "description": "Folder walk (metadata only), Rules filter, inode-aware sync/move/prune, dataset detection. All-language file names.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/test/java/com/digup/android/engine/CrawlerTest.kt"],
+        "notes": "Linux-safe; temp-dir fixtures"
+      },
+      "subtasks": [
+        { "id": "F001-1", "name": "Rules classify + secrets/datasets", "status": "planned" },
+        { "id": "F001-2", "name": "Sync reconcile + move-aware repath", "status": "planned" }
+      ],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F002",
+      "name": "Images + screenshots + OCR",
+      "description": "Downscale + EXIF, screenshot detect, ML Kit OCR as FTS-only (no vector).",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/test/java/com/digup/android/engine/PrepareTest.kt"],
+        "notes": "OCR gap labelled, image vector still matches"
+      },
+      "subtasks": [{ "id": "F002-1", "name": "ImagePrepare sizes + skip rules", "status": "planned" }],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F003",
+      "name": "PDF ingestion",
+      "description": "PdfiumAndroid text/image per page, glyph-order and lost-letter handling, two-pass long files.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/test/java/com/digup/android/engine/PdfTest.kt"],
+        "notes": "Needs device render parity check"
+      },
+      "subtasks": [{ "id": "F003-1", "name": "Page classify + render fallback", "status": "planned" }],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F004",
+      "name": "Doc ingestion + chunker",
+      "description": "txt/md/html/docx/odt/rtf to 1800/200 chunks, digit-dump keyword-only rule.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/test/java/com/digup/android/engine/ChunkTest.kt"],
+        "notes": "Deterministic resume across passes"
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F005",
+      "name": "Audio windows",
+      "description": "16kHz mono 30s/25s windows, silence gate, streaming decode.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/test/java/com/digup/android/engine/AudioTest.kt"],
+        "notes": "Linux ffmpeg parity first"
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F006",
+      "name": "Video keyframes + soundtrack",
+      "description": "1fps extract, aHash dedup to ~1/3s, cap 1200, soundtrack via F005.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/test/java/com/digup/android/engine/VideoTest.kt"],
+        "notes": "MTS lead-back covered on device"
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F007",
+      "name": "IndexStore + fingerprint",
+      "description": "Room/SQLite files+segments+fts, migrations, fingerprint reset, scope support.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/test/java/com/digup/android/engine/IndexStoreTest.kt"],
+        "notes": "Robolectric in-memory FTS5"
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F008",
+      "name": "Searcher fusion",
+      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, ≥6 scripts in evals.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/test/java/com/digup/android/engine/SearcherTest.kt"],
+        "notes": "make eval R@1 gate"
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F009",
+      "name": "Background + power",
+      "description": "WorkManager first pass, MediaStore observer, thermal/Doze guards, watchdog, estimates.",
+      "status": "planned",
+      "priority": "medium",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/androidTest/java/com/digup/android/engine/PowerTest.kt"],
+        "notes": "Device-only"
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F010",
+      "name": "Voice STT/TTS + cloud toggle",
+      "description": "On-device default, opt-in cloud STT/TTS + transcript boost rows, key storage, cost meter.",
+      "status": "planned",
+      "priority": "medium",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/androidTest/java/com/digup/android/engine/VoiceTest.kt"],
+        "notes": "Airplane-mode fallback verified on device"
+      },
+      "subtasks": [
+        { "id": "F010-1", "name": "On-device STT/TTS", "status": "planned" },
+        { "id": "F010-2", "name": "Cloud toggle + transcript rows", "status": "planned" }
+      ],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F011",
+      "name": "Search UI + status + settings",
+      "description": "Compose SearchScreen, status sheet, settings (folders, battery, voice, models, wipe). 3 screens only.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/app",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/androidTest/java/com/digup/android/app/SearchTest.kt"],
+        "notes": "Paparazzi snapshots + thumb test on phone"
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F012",
+      "name": "Model manager + SoC picker",
+      "description": "Staged download (270M→440M→740M), per-SoC AOT select, SHA verify, reference-vector gate.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": ["app/src/test/java/com/digup/android/engine/ModelTest.kt"],
+        "notes": "Linux text-signature parity first"
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-14",
+      "completed": null
+    }
+  ]
+}

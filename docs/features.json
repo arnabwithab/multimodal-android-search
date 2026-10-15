@@ -3,12 +3,12 @@
   "last_updated": "2026-10-15",
   "summary": {
     "total": 14,
-    "completed": 9,
+    "completed": 10,
     "in_progress": 0,
-    "planned": 5,
-    "tests_passing": 149,
+    "planned": 4,
+    "tests_passing": 164,
     "tests_failing": 0,
-    "tests_missing": 5
+    "tests_missing": 4
   },
   "features": [
     {
@@ -200,21 +200,21 @@
       "id": "F009",
       "name": "Background + power",
       "description": "WorkManager first pass, MediaStore observer, thermal/Doze guards, watchdog, estimates.",
-      "status": "planned",
+      "status": "completed",
       "priority": "medium",
       "module": "app/src/main/java/com/digup/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
-          "app/src/androidTest/java/com/digup/android/engine/PowerTest.kt"
+          "app/src/test/java/com/digup/android/engine/PowerTest.kt"
         ],
-        "notes": "Device-only"
+        "notes": "15 JVM tests passing; greptile-reviewed, fixes re-reviewed PASS; WorkManager/Doze device E2E remains a gap"
       },
       "subtasks": [],
       "notes": "",
       "added": "2026-10-14",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F010",

@@ -1,5 +1,7 @@
 # Multimodal Search for Android — Makefile (single entry point, thin wrappers only)
-export JAVA_HOME ?= /usr/lib/jvm/java-17-openjdk-amd64
+# JAVA_HOME falls back to the first candidate shipping bin/javac (default java-21 here is JRE-only and breaks fresh compiles)
+_JAVAC_HOME := $(shell dirname $$(dirname $$(readlink -f $$(which javac 2>/dev/null))) 2>/dev/null)
+export JAVA_HOME ?= $(firstword $(foreach d,/usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/jvm/java-21-openjdk-amd64 $(_JAVAC_HOME),$(if $(wildcard $(d)/bin/javac),$(d),)))
 GRADLE ?= $(HOME)/.gradle/wrapper/dists/gradle-8.14.3-bin/*/gradle-8.14.3/bin/gradle
 # Resolve glob at run time
 GRADLE_BIN := $(firstword $(wildcard $(HOME)/.gradle/wrapper/dists/gradle-8.14.3-bin/*/gradle-8.14.3/bin/gradle))

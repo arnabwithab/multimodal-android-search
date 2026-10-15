@@ -2,11 +2,11 @@
   "project": "multimodal-search-for-android",
   "last_updated": "2026-10-15",
   "summary": {
-    "total": 12,
-    "completed": 3,
+    "total": 14,
+    "completed": 5,
     "in_progress": 0,
     "planned": 9,
-    "tests_passing": 48,
+    "tests_passing": 90,
     "tests_failing": 0,
     "tests_missing": 9
   },
@@ -98,41 +98,41 @@
       "id": "F004",
       "name": "Doc ingestion + chunker",
       "description": "txt/md/html/docx/odt/rtf to 1800/200 chunks, digit-dump keyword-only rule.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
           "app/src/test/java/com/digup/android/engine/ChunkTest.kt"
         ],
-        "notes": "Deterministic resume across passes"
+        "notes": "20 tests green via make test; greptile-reviewed, fixes re-reviewed PASS"
       },
       "subtasks": [],
       "notes": "",
       "added": "2026-10-14",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F005",
       "name": "Audio windows",
       "description": "16kHz mono 30s/25s windows, silence gate, streaming decode.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
           "app/src/test/java/com/digup/android/engine/AudioTest.kt"
         ],
-        "notes": "Linux ffmpeg parity first"
+        "notes": "9 tests green via make test; greptile-reviewed, fixes re-reviewed PASS"
       },
       "subtasks": [],
       "notes": "",
       "added": "2026-10-14",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F006",
@@ -177,7 +177,7 @@
     {
       "id": "F008",
       "name": "Searcher fusion",
-      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, ≥6 scripts in evals.",
+      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, \u22656 scripts in evals.",
       "status": "planned",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
@@ -268,7 +268,7 @@
     {
       "id": "F012",
       "name": "Model manager + SoC picker",
-      "description": "Staged download (270M→440M→740M), per-SoC AOT select, SHA verify, reference-vector gate.",
+      "description": "Staged download (270M\u2192440M\u2192740M), per-SoC AOT select, SHA verify, reference-vector gate.",
       "status": "planned",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
@@ -283,6 +283,46 @@
       "subtasks": [],
       "notes": "",
       "added": "2026-10-14",
+      "completed": null
+    },
+    {
+      "id": "F013",
+      "name": "Embedder + fingerprint",
+      "description": "LiteRT-LM interface embedTexts/embedImages/embedAudio, single-mutex serialisation, MRL 256d truncate+renorm, fingerprint model@rev runtime dtype dim budgets + resetAll.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": [
+          "app/src/test/java/com/digup/android/engine/EmbedderTest.kt"
+        ],
+        "notes": "reference-vector gate on device; Linux tests use a fake backend"
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-15",
+      "completed": null
+    },
+    {
+      "id": "F014",
+      "name": "Indexer batching + two-pass",
+      "description": "job batching (images x8 else x1), overlap prepare+embed, finishLongFiles, pending/unfinished wiring to IndexStore.",
+      "status": "planned",
+      "priority": "high",
+      "module": "app/src/main/java/com/digup/android/engine",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": [
+          "app/src/test/java/com/digup/android/engine/IndexerTest.kt"
+        ],
+        "notes": "fake Embedder + IndexStore; device timing later"
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-15",
       "completed": null
     }
   ]

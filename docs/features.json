@@ -3,12 +3,12 @@
   "last_updated": "2026-10-15",
   "summary": {
     "total": 14,
-    "completed": 13,
+    "completed": 14,
     "in_progress": 0,
-    "planned": 1,
-    "tests_passing": 200,
+    "planned": 0,
+    "tests_passing": 235,
     "tests_failing": 0,
-    "tests_missing": 1
+    "tests_missing": 0
   },
   "features": [
     {
@@ -167,7 +167,7 @@
         "files": [
           "app/src/test/java/com/digup/android/engine/IndexStoreTest.kt"
         ],
-        "notes": "14 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; exact arch \u00a75 FTS5 tokenizer verified on bundled SQLite"
+        "notes": "14 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; exact arch §5 FTS5 tokenizer verified on bundled SQLite"
       },
       "subtasks": [],
       "notes": "",
@@ -177,7 +177,7 @@
     {
       "id": "F008",
       "name": "Searcher fusion",
-      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, \u22656 scripts in evals.",
+      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, ≥6 scripts in evals.",
       "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
@@ -251,26 +251,26 @@
       "id": "F011",
       "name": "Search UI + status + settings",
       "description": "Compose SearchScreen, status sheet, settings (folders, battery, voice, models, wipe). 3 screens only.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/app",
       "design_doc": "docs/design.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
-          "app/src/androidTest/java/com/digup/android/app/SearchTest.kt"
+          "app/src/test/java/com/digup/android/app/UiStateTest.kt"
         ],
-        "notes": "Paparazzi snapshots + thumb test on phone"
+        "notes": "35 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; Compose binding + Paparazzi on device"
       },
       "subtasks": [],
       "notes": "",
       "added": "2026-10-14",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F012",
       "name": "Model manager + SoC picker",
-      "description": "Staged download (270M\u2192440M\u2192740M), per-SoC AOT select, SHA verify, reference-vector gate.",
+      "description": "Staged download (270M→440M→740M), per-SoC AOT select, SHA verify, reference-vector gate.",
       "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",

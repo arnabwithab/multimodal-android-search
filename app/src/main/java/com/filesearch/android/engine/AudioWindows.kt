@@ -15,7 +15,10 @@ object AudioWindows {
         val loc: Double get() = startSec
     }
 
-    fun planWindows(durationSec: Double, rmsDbOfWindow: (index: Int) -> Double): List<AudioWindow> {
+    fun planWindows(
+        durationSec: Double,
+        rmsDbOfWindow: (index: Int) -> Double,
+    ): List<AudioWindow> {
         val windows = mutableListOf<AudioWindow>()
         var index = 0
         var start = 0.0

@@ -1,5 +1,7 @@
 plugins {
     kotlin("jvm") version "2.0.21"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
+    id("io.gitlab.arturbosch.detekt") version "1.23.7"
 }
 
 group = "com.filesearch.android"
@@ -23,4 +25,9 @@ tasks.test {
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     kotlinOptions.jvmTarget = "17"
+}
+
+detekt {
+    config.setFrom(files("${rootProject.projectDir}/config/detekt.yml"))
+    buildUponDefaultConfig = true
 }

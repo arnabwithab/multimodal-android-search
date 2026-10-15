@@ -7,7 +7,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AudioTest {
-
     private val loud: (Int) -> Double = { 0.0 }
 
     @Test
@@ -65,9 +64,10 @@ class AudioTest {
 
     @Test
     fun `rmsDb of full-scale sine is near minus 3dB`() {
-        val samples = ShortArray(16000) { i ->
-            (sin(2 * PI * 440 * i / 16000) * Short.MAX_VALUE).toInt().toShort()
-        }
+        val samples =
+            ShortArray(16000) { i ->
+                (sin(2 * PI * 440 * i / 16000) * Short.MAX_VALUE).toInt().toShort()
+            }
         assertEquals(-3.01, AudioWindows.rmsDb(samples), 0.05)
     }
 

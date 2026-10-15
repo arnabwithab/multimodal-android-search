@@ -7,7 +7,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ModelTest {
-
     // nextNeeded staging
 
     @Test

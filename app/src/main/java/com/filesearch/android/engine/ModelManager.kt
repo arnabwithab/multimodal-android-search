@@ -7,6 +7,7 @@ data class ModelPack(val id: String, val bytes: Long)
 
 object ModelPacks {
     private const val MB = 1024L * 1024L
+
     // Sizes are incremental deltas: 165MB base, +223MB vision, +97MB audio (totals 388/485).
     val TEXT_270M = ModelPack("text-270m", 165L * MB)
     val TEXT_VISION_440M = ModelPack("text-vision-440m", 223L * MB)
@@ -24,13 +25,19 @@ object ModelManager {
     private val staged = listOf(ModelPacks.TEXT_270M, ModelPacks.TEXT_VISION_440M, ModelPacks.FULL_740M)
 
     /** Next staged pack to fetch, or null when satisfied (740M only when [wantAudio]). */
-    fun nextNeeded(have: Set<String>, wantAudio: Boolean): ModelPack? {
+    fun nextNeeded(
+        have: Set<String>,
+        wantAudio: Boolean,
+    ): ModelPack? {
         val want = if (wantAudio) staged else staged.take(2)
         return want.firstOrNull { it.id !in have }
     }
 
     /** Exact SoC -> generic NPU/TPU (Pixel Tensor) -> GPU -> CPU/XNNPACK; never throws. */
-    fun pickArtifact(soc: String, artifacts: List<String>): String {
+    fun pickArtifact(
+        soc: String,
+        artifacts: List<String>,
+    ): String {
         if (artifacts.isEmpty()) return "cpu"
         if (soc.isNotBlank()) artifacts.firstOrNull { it.contains(soc, ignoreCase = true) }?.let { return it }
         artifacts.firstOrNull {
@@ -46,16 +53,22 @@ object ModelManager {
     }
 
     /** SHA-256 of [bytes] equals [expectedHex] (constant-time compare). */
-    fun shaOk(bytes: ByteArray, expectedHex: String): Boolean =
-        shaOk(bytes.inputStream(), expectedHex)
+    fun shaOk(
+        bytes: ByteArray,
+        expectedHex: String,
+    ): Boolean = shaOk(bytes.inputStream(), expectedHex)
 
     /** Streaming SHA-256 check — never holds the whole pack in RAM (constant-time compare). */
-    fun shaOk(stream: InputStream, expectedHex: String): Boolean {
-        val expected = try {
-            hexToBytes(expectedHex.trim().lowercase())
-        } catch (_: Exception) {
-            return false
-        }
+    fun shaOk(
+        stream: InputStream,
+        expectedHex: String,
+    ): Boolean {
+        val expected =
+            try {
+                hexToBytes(expectedHex.trim().lowercase())
+            } catch (_: Exception) {
+                return false
+            }
         val md = MessageDigest.getInstance("SHA-256")
         val buf = ByteArray(8192)
         var n: Int
@@ -69,5 +82,8 @@ object ModelManager {
     }
 
     /** IndexStore fingerprint `model@rev runtime dtype dim budgets`; null stored -> false. */
-    fun fingerprintOk(stored: String?, current: String): Boolean = stored == current
+    fun fingerprintOk(
+        stored: String?,
+        current: String,
+    ): Boolean = stored == current
 }

@@ -18,26 +18,39 @@ fun formatFor(fileName: String): DocFormat? {
 }
 
 // shortcut: corrupt input returns empty, switch to nullable so Indexer can mark failed per design.md §11
-fun extractText(format: DocFormat, bytes: ByteArray): String = when (format) {
-    DocFormat.TXT, DocFormat.MD -> bytes.toString(Charsets.UTF_8)
-    DocFormat.HTML -> stripHtml(bytes.toString(Charsets.UTF_8))
-    DocFormat.DOCX -> stripTags(zipEntry(bytes, "word/document.xml"))
-    DocFormat.ODT -> stripTags(zipEntry(bytes, "content.xml"))
-    DocFormat.RTF -> stripRtf(bytes.toString(Charsets.UTF_8))
-}
+fun extractText(
+    format: DocFormat,
+    bytes: ByteArray,
+): String =
+    when (format) {
+        DocFormat.TXT, DocFormat.MD -> bytes.toString(Charsets.UTF_8)
+        DocFormat.HTML -> stripHtml(bytes.toString(Charsets.UTF_8))
+        DocFormat.DOCX -> stripTags(zipEntry(bytes, "word/document.xml"))
+        DocFormat.ODT -> stripTags(zipEntry(bytes, "content.xml"))
+        DocFormat.RTF -> stripRtf(bytes.toString(Charsets.UTF_8))
+    }
 
 /** Zip entry text or "" when missing/corrupt — never throws. */
-private fun zipEntry(bytes: ByteArray, name: String): String {
+private fun zipEntry(
+    bytes: ByteArray,
+    name: String,
+): String {
     try {
         ZipInputStream(bytes.inputStream()).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
-                if (entry.name == name) return zip.readBytes().toString(Charsets.UTF_8) // shortcut: zip entry read uncapped, cap at ~32MB when Indexer wires untrusted input
+                if (entry.name == name) {
+                    return zip.readBytes().toString(
+                        Charsets.UTF_8,
+                    ) // shortcut: zip entry read uncapped, cap at ~32MB when Indexer wires untrusted input
+                }
                 zip.closeEntry()
                 entry = zip.nextEntry
             }
         }
-    } catch (_: Exception) { /* corrupt zip -> "" */ }
+    } catch (_: Exception) {
+        // corrupt zip -> ""
+    }
     return ""
 }
 
@@ -47,12 +60,12 @@ private fun stripHtml(html: String): String {
     return unescape(stripTags(s))
 }
 
-private fun stripTags(s: String): String =
-    s.replace(Regex("<[^>]*>"), " ").replace(Regex("\\s+"), " ").trim()
+private fun stripTags(s: String): String = s.replace(Regex("<[^>]*>"), " ").replace(Regex("\\s+"), " ").trim()
 
-private fun unescape(s: String): String = s
-    .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'")
-    .replace("&amp;", "&")
+private fun unescape(s: String): String =
+    s
+        .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'")
+        .replace("&amp;", "&")
 
 // Best-effort one pass: control words go, braces go, text stays.
 // shortcut: RTF \uN and hex escapes pass through as noise
@@ -66,14 +79,19 @@ data class Chunk(
     val startChar: Int,
     val endChar: Int,
     val text: String,
-    val vectorWanted: Boolean
+    val vectorWanted: Boolean,
 )
 
 /**
  * ~1800 chars with 200 overlap, broken at whitespace. Deterministic: same input
  * always yields identical starts, so later passes resume exactly.
  */
-fun chunk(text: String, chunkSize: Int = 1800, overlap: Int = 200, maxChunks: Int = 5000): List<Chunk> {
+fun chunk(
+    text: String,
+    chunkSize: Int = 1800,
+    overlap: Int = 200,
+    maxChunks: Int = 5000,
+): List<Chunk> {
     if (text.isBlank()) return emptyList()
     val size = chunkSize.coerceAtLeast(1)
     val hop = overlap.coerceIn(0, size - 1).let { size - it }

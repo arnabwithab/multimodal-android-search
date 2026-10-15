@@ -19,20 +19,20 @@ fun shouldPause(
     dozing: Boolean,
     chargerOnly: Boolean,
     onCharger: Boolean,
-): PauseReason = when {
-    thermalSevere -> PauseReason.THERMAL_SEVERE
-    batteryLow -> PauseReason.BATTERY_LOW
-    dozing -> PauseReason.DOZE
-    chargerOnly && !onCharger -> PauseReason.CHARGER_ONLY
-    else -> PauseReason.OK
-}
+): PauseReason =
+    when {
+        thermalSevere -> PauseReason.THERMAL_SEVERE
+        batteryLow -> PauseReason.BATTERY_LOW
+        dozing -> PauseReason.DOZE
+        chargerOnly && !onCharger -> PauseReason.CHARGER_ONLY
+        else -> PauseReason.OK
+    }
 
 /**
  * Retry backoff: 30s base, doubling, capped at 30min (arch §6 retry with backoff).
  * [attempt] is 0-indexed (0 = first retry).
  */
-fun backoffMs(attempt: Int): Long =
-    minOf(30_000L shl attempt.coerceIn(0, 6), 1_800_000L)
+fun backoffMs(attempt: Int): Long = minOf(30_000L shl attempt.coerceIn(0, 6), 1_800_000L)
 
 /** Decoder stuck past this with no progress: kill job, mark stopped, keep partial (arch §6). */
 const val WATCHDOG_STUCK_MS = 5 * 60 * 1000L
@@ -41,8 +41,10 @@ const val WATCHDOG_STUCK_MS = 5 * 60 * 1000L
  * True when no progress for longer than [WATCHDOG_STUCK_MS].
  * Caller kills the job, marks the file stopped, and keeps partial segments.
  */
-fun watchdogTripped(lastProgressMs: Long, nowMs: Long): Boolean =
-    nowMs - lastProgressMs > WATCHDOG_STUCK_MS
+fun watchdogTripped(
+    lastProgressMs: Long,
+    nowMs: Long,
+): Boolean = nowMs - lastProgressMs > WATCHDOG_STUCK_MS
 
 /**
  * Honest "≈N min left" estimator (arch §6): per-kind ms/file running averages.
@@ -64,7 +66,10 @@ class MeasuredCosts(perKindMsPerFile: Map<String, Double>) {
     }
 
     /** Fold one finished file into the running average for [kind]. */
-    fun record(kind: String, elapsedMs: Long) {
+    fun record(
+        kind: String,
+        elapsedMs: Long,
+    ) {
         if (elapsedMs < 0) return // clock-skew poison
         sums[kind] = (sums[kind] ?: 0.0) + elapsedMs
         counts[kind] = (counts[kind] ?: 0L) + 1L

@@ -62,13 +62,14 @@ object Vectors {
         val exp = (bits ushr 10) and 0x1f
         val mant = bits and 0x3ff
         return when {
-            exp == 0 -> if (mant == 0) {
-                Float.fromBits(sign)
-            } else {
-                // Subnormal: mant * 2^-24, exact in float32.
-                val s = if (sign != 0) -1.0f else 1.0f
-                s * mant.toFloat() * 5.9604645e-8f
-            }
+            exp == 0 ->
+                if (mant == 0) {
+                    Float.fromBits(sign)
+                } else {
+                    // Subnormal: mant * 2^-24, exact in float32.
+                    val s = if (sign != 0) -1.0f else 1.0f
+                    s * mant.toFloat() * 5.9604645e-8f
+                }
             exp == 0x1f -> Float.fromBits(sign or 0x7f800000 or (mant shl 13)) // Inf/NaN
             else -> Float.fromBits(sign or ((exp - 15 + 127) shl 23) or (mant shl 13))
         }
@@ -78,7 +79,10 @@ object Vectors {
      * Slice to [dim] (MRL truncation) and L2 re-normalise. Query and docs must
      * share the dim (256d v1); larger targets than the input are rejected.
      */
-    fun truncateRenorm(v: FloatArray, dim: Int = 256): FloatArray {
+    fun truncateRenorm(
+        v: FloatArray,
+        dim: Int = 256,
+    ): FloatArray {
         require(dim > 0) { "truncateRenorm: dim must be positive, was $dim" }
         require(v.size >= dim) {
             "truncateRenorm: vector dim ${v.size} < target $dim (query/doc dims must match)"
@@ -93,7 +97,10 @@ object Vectors {
     }
 
     /** Cosine similarity; zero vectors score 0.0. Dims must match. */
-    fun cosine(a: FloatArray, b: FloatArray): Double {
+    fun cosine(
+        a: FloatArray,
+        b: FloatArray,
+    ): Double {
         require(a.size == b.size) {
             "cosine: dim mismatch ${a.size} vs ${b.size} (query/doc must share dim)"
         }
@@ -110,6 +117,8 @@ object Vectors {
     }
 
     /** Naive block scorer (no JNI): one cosine per row, same order as [matrix]. */
-    fun topScores(query: FloatArray, matrix: List<FloatArray>): DoubleArray =
-        DoubleArray(matrix.size) { cosine(query, matrix[it]) }
+    fun topScores(
+        query: FloatArray,
+        matrix: List<FloatArray>,
+    ): DoubleArray = DoubleArray(matrix.size) { cosine(query, matrix[it]) }
 }

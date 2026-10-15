@@ -3,7 +3,7 @@
 <p align="center">Private, on-device search across your photos, PDFs, docs, audio and video.</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/build-unknown-lightgrey" alt="build status"/>
+  <img src="https://img.shields.io/github/actions/workflow/status/arnabwithab/multimodal-android-search/ci.yml?branch=main" alt="build status"/>
   <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="version"/>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license"/>
   <img src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin"/>

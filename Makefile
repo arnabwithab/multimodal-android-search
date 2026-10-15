@@ -27,7 +27,7 @@ bench-device: ## NPU/GPU/CPU latency + RSS on attached device
 	@if [ -f scripts/bench-device.sh ]; then bash scripts/bench-device.sh; else echo "shortcut: scripts/bench-device.sh not present yet — skipping."; fi
 
 style: ## ktlint + detekt (format + lint in one)
-	@if command -v ktlint >/dev/null 2>&1; then ktlint "app/src/**/*.kt"; else echo "shortcut: ktlint not installed — skipping (CI adds it)."; fi
+	$(GRADLE_BIN) :app:ktlintCheck :app:detekt --console=plain
 
 build: ## release artefact
 	$(GRADLE_BIN) :app:assemble --console=plain || $(GRADLE_BIN) :app:build -x test --console=plain

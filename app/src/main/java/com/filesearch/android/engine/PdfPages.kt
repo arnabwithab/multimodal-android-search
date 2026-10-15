@@ -18,7 +18,11 @@ private const val MAX_PAGES = 5000
 /**
  * @param isScanned image-only page (no text layer); set by the Pdfium probe, not inferred here.
  */
-fun classifyPage(text: String, isLocked: Boolean, isScanned: Boolean): PageClass {
+fun classifyPage(
+    text: String,
+    isLocked: Boolean,
+    isScanned: Boolean,
+): PageClass {
     if (isLocked) return PageClass.LOCKED
     if (isScanned || text.trim().length < MIN_TEXT_CHARS) return PageClass.RENDER_ONLY
     if (glyphOrderGarbleRate(text) >= GARBLE_THRESHOLD) return PageClass.RENDER_ONLY
@@ -27,15 +31,16 @@ fun classifyPage(text: String, isLocked: Boolean, isScanned: Boolean): PageClass
 }
 
 // shortcut: inline ranges; move to an engine/lang/ table (per AGENTS.md) when a new script needs support.
-private fun isIndicVowelSign(c: Char): Boolean = c.code in 0x093E..0x094C || // Devanagari
-    c.code in 0x09BE..0x09CC || // Bengali
-    c.code in 0x0A3E..0x0A4C || // Gurmukhi
-    c.code in 0x0ABE..0x0ACC || // Gujarati
-    c.code in 0x0B3E..0x0B4C || // Oriya
-    c.code in 0x0BBE..0x0BCC || // Tamil
-    c.code in 0x0C3E..0x0C4C || // Telugu
-    c.code in 0x0CBE..0x0CCC || // Kannada
-    c.code in 0x0D3E..0x0D4C // Malayalam
+private fun isIndicVowelSign(c: Char): Boolean =
+    c.code in 0x093E..0x094C || // Devanagari
+        c.code in 0x09BE..0x09CC || // Bengali
+        c.code in 0x0A3E..0x0A4C || // Gurmukhi
+        c.code in 0x0ABE..0x0ACC || // Gujarati
+        c.code in 0x0B3E..0x0B4C || // Oriya
+        c.code in 0x0BBE..0x0BCC || // Tamil
+        c.code in 0x0C3E..0x0C4C || // Telugu
+        c.code in 0x0CBE..0x0CCC || // Kannada
+        c.code in 0x0D3E..0x0D4C // Malayalam
 
 /** Fraction of Indic vowel signs detached from their consonant (space/start before). 0.0 when none. */
 fun glyphOrderGarbleRate(text: String): Double {
@@ -52,6 +57,7 @@ fun glyphOrderGarbleRate(text: String): Double {
 }
 
 private fun isArabic(c: Char): Boolean = c.code in 0x0600..0x06FF
+
 private fun isJoiningForm(c: Char): Boolean = c.code in 0xFB50..0xFDFF || c.code in 0xFE70..0xFEFF
 
 /** True when Arabic letters came out isolated with spaces ("ا ل ع ر ب") instead of joined words. */
@@ -70,7 +76,7 @@ fun hasLostArabicLetters(text: String): Boolean {
 data class TwoPassPlan(
     val firstPassPages: IntRange,
     val secondPassPages: IntRange?,
-    val longFile: Boolean
+    val longFile: Boolean,
 )
 
 /** First 30 pages now, the rest after everything else is searchable. */

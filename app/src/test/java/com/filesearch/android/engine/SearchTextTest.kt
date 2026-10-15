@@ -6,7 +6,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SearchTextTest {
-
     @Test
     fun `NFKC folds compatibility characters`() {
         assertEquals("ABC", SearchText.normalize("ＡＢＣ")) // fullwidth
@@ -78,15 +77,16 @@ class SearchTextTest {
     fun `normalisation is script-agnostic across six-plus scripts`() {
         // CJK/Thai have no spaces: they match as prefixes downstream (FTS),
         // here normalize must simply pass them through unharmed.
-        val queries = mapOf(
-            "latin" to "where they talk about sleep",
-            "bengali" to "ঘুম নিয়ে",
-            "arabic" to "النوم",
-            "devanagari" to "नींद",
-            "cjk" to "睡眠",
-            "thai" to "การนอนหลับ",
-            "cyrillic" to "сон",
-        )
+        val queries =
+            mapOf(
+                "latin" to "where they talk about sleep",
+                "bengali" to "ঘুম নিয়ে",
+                "arabic" to "النوم",
+                "devanagari" to "नींद",
+                "cjk" to "睡眠",
+                "thai" to "การนอนหลับ",
+                "cyrillic" to "сон",
+            )
         for ((script, q) in queries) {
             val norm = SearchText.normalize(q)
             assertTrue(norm.isNotEmpty(), "$script must survive normalize")

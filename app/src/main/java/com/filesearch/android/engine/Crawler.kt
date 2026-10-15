@@ -34,18 +34,20 @@ class Crawler(
         stack.add(root)
         while (stack.isNotEmpty()) {
             val dir = stack.removeLast()
-            val kids: Array<File> = try {
-                dir.listFiles()
-            } catch (_: SecurityException) {
-                null
-            } ?: emptyArray()
+            val kids: Array<File> =
+                try {
+                    dir.listFiles()
+                } catch (_: SecurityException) {
+                    null
+                } ?: emptyArray()
             if (kids.isEmpty() && !dir.canRead()) {
                 _errors.add("unreadable dir: ${dir.path}")
                 continue
             }
-            val dataset = Rules.isDatasetDir(
-                kids.count { it.isFile && Rules.isMediaName(it.name) && Rules.isMachineNamed(it.name) },
-            )
+            val dataset =
+                Rules.isDatasetDir(
+                    kids.count { it.isFile && Rules.isMediaName(it.name) && Rules.isMachineNamed(it.name) },
+                )
             for (kid in kids) {
                 if (Files.isSymbolicLink(kid.toPath())) continue
                 if (kid.isDirectory) {
@@ -64,7 +66,10 @@ class Crawler(
         return found
     }
 
-    private fun addFile(f: File, out: MutableList<CrawlEntry>) {
+    private fun addFile(
+        f: File,
+        out: MutableList<CrawlEntry>,
+    ) {
         val decision = filter(f.path, f.length(), f.isHidden, isCloudPlaceholder(f))
         if (decision == FileDecision.INDEX) {
             out.add(CrawlEntry(f.path, f.length(), f.lastModified(), inodeOf(f)))
@@ -74,9 +79,10 @@ class Crawler(
     }
 }
 
-fun inodeOf(f: File): Long = try {
-    (Files.getAttribute(f.toPath(), "unix:ino") as Number).toLong()
-} catch (_: Exception) {
-    // shortcut: non-Linux fallback breaks move detection; Linux CI and Android both provide unix:ino.
-    f.absolutePath.hashCode().toLong()
-}
+fun inodeOf(f: File): Long =
+    try {
+        (Files.getAttribute(f.toPath(), "unix:ino") as Number).toLong()
+    } catch (_: Exception) {
+        // shortcut: non-Linux fallback breaks move detection; Linux CI and Android both provide unix:ino.
+        f.absolutePath.hashCode().toLong()
+    }

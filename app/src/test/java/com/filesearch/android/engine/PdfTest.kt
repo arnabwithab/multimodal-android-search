@@ -7,7 +7,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PdfTest {
-
     private fun longLatin(): String = "The quick brown fox jumps over the lazy riverbank. ".repeat(5)
 
     @Test

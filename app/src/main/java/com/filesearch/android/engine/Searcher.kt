@@ -44,14 +44,15 @@ object Searcher {
     /** Strong rows score >= this fraction of the top (design §4 rows). */
     const val STRONG_FRACTION = 0.5
 
+    // shortcut: default data-class equals compares FloatArray by reference; fine
+    // while callers only compare Hit ids/scores, upgrade if Cands are ever diffed.
+
     /**
      * One retrievable row.
      *
      * @param ftsRank raw FTS5 rank carried for the caller; fusion uses
      *   [wordCoverage], the 0..1 normalisation of the word match.
      */
-    // shortcut: default data-class equals compares FloatArray by reference; fine
-    // while callers only compare Hit ids/scores, upgrade if Cands are ever diffed.
     data class Cand(
         val id: Long,
         val modality: String,
@@ -83,14 +84,15 @@ object Searcher {
         val globalMean = centred.average()
         val std = sqrt(centred.sumOf { (it - globalMean) * (it - globalMean) } / centred.size)
         val wordWeight = WORD_WEIGHT * if (isLookup) LOOKUP_WORD_MULTIPLIER else 1.0
-        val scored = cands.indices.map { i ->
-            val z = if (std > 0.0) centred[i] / std else Double.NEGATIVE_INFINITY
-            val meaning = if (z >= Z_GATE) z else 0.0
-            val coverage = cands[i].wordCoverage.coerceIn(0.0, 1.0)
-            var s = meaning + wordWeight * coverage.pow(WORD_EXPONENT)
-            if (kindHint != null && cands[i].kind.equals(kindHint, ignoreCase = true)) s += KIND_BOOST
-            Hit(cands[i].id, s, strong = false)
-        }.sortedByDescending { it.score }
+        val scored =
+            cands.indices.map { i ->
+                val z = if (std > 0.0) centred[i] / std else Double.NEGATIVE_INFINITY
+                val meaning = if (z >= Z_GATE) z else 0.0
+                val coverage = cands[i].wordCoverage.coerceIn(0.0, 1.0)
+                var s = meaning + wordWeight * coverage.pow(WORD_EXPONENT)
+                if (kindHint != null && cands[i].kind.equals(kindHint, ignoreCase = true)) s += KIND_BOOST
+                Hit(cands[i].id, s, strong = false)
+            }.sortedByDescending { it.score }
         // Honest empty (design §6): nothing stands out -> nothing marked strong.
         if (scored.first().score <= 0.0) return scored.map { it.copy(strong = false) }
         val cutoff = STRONG_FRACTION * scored.first().score

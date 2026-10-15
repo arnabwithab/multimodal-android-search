@@ -6,7 +6,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 
 class VoiceTest {
-
     @Test
     fun `voice toggles are off on install`() {
         val config = VoiceConfig()
@@ -31,12 +30,13 @@ class VoiceTest {
 
     @Test
     fun `purge keeps only api rows and dedupes ids`() {
-        val rows = listOf(
-            TranscriptRow(fileId = 1L, text = "a"),
-            TranscriptRow(fileId = 1L, text = "a dup"),
-            TranscriptRow(fileId = 2L, text = "b", origin = "transcript=local"),
-            TranscriptRow(fileId = 3L, text = "c"),
-        )
+        val rows =
+            listOf(
+                TranscriptRow(fileId = 1L, text = "a"),
+                TranscriptRow(fileId = 1L, text = "a dup"),
+                TranscriptRow(fileId = 2L, text = "b", origin = "transcript=local"),
+                TranscriptRow(fileId = 3L, text = "c"),
+            )
         assertEquals(listOf(1L, 3L), purgeOnToggleOff(rows))
     }
 

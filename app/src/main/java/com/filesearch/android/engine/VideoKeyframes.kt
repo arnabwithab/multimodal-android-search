@@ -26,7 +26,10 @@ object VideoKeyframes {
         return hash
     }
 
-    fun hamming(a: Long, b: Long): Int = (a xor b).countOneBits()
+    fun hamming(
+        a: Long,
+        b: Long,
+    ): Int = (a xor b).countOneBits()
 
     /**
      * 1fps input hashes: keep first frame, then any frame with
@@ -34,7 +37,10 @@ object VideoKeyframes {
      * Post-dedup thinning keeps ~1 frame per 3s so fast-cut video
      * cannot fill the [MAX_FRAMES] cap early and drop the file tail.
      */
-    fun selectFrames(hashes: List<Long>, durationSec: Double = hashes.size.toDouble()): List<Int> {
+    fun selectFrames(
+        hashes: List<Long>,
+        durationSec: Double = hashes.size.toDouble(),
+    ): List<Int> {
         if (hashes.isEmpty()) return emptyList()
         val kept = mutableListOf(0)
         var last = hashes[0]
@@ -55,7 +61,11 @@ object VideoKeyframes {
      * [keptIndices] must be sorted unique (as [selectFrames] returns);
      * the last span is clamped so endSec never precedes startSec.
      */
-    fun planSpans(keptIndices: List<Int>, durationSec: Double, fps: Int = 1): List<VideoFrame> {
+    fun planSpans(
+        keptIndices: List<Int>,
+        durationSec: Double,
+        fps: Int = 1,
+    ): List<VideoFrame> {
         require(fps > 0) { "fps must be positive, got $fps" }
         if (keptIndices.isEmpty()) return emptyList()
         for (i in 1 until keptIndices.size) {

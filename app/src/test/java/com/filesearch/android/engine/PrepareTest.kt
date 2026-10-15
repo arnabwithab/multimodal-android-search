@@ -7,7 +7,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PrepareTest {
-
     @Test
     fun `photo plan uses 1024 longest side and 140 tokens`() {
         val plan = plan(4000, 3000, isScreenshot = false, format = "jpg")

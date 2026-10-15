@@ -1,5 +1,6 @@
 package com.filesearch.android.engine
 
+import org.junit.jupiter.api.Test
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.sqrt
@@ -8,7 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Test
 
 /** Deterministic fake: unit-norm vectors seeded by content hash. */
 class FakeBackend(val vecDim: Int = 512, val delayMs: Long = 0) : EmbedBackend {
@@ -19,9 +19,12 @@ class FakeBackend(val vecDim: Int = 512, val delayMs: Long = 0) : EmbedBackend {
     private val active = AtomicInteger(0)
     val maxActive = AtomicInteger(0)
 
-    fun vecFor(s: String): FloatArray = norm(FloatArray(vecDim) {
-        Random(s.hashCode().toLong() * 31 + it).nextFloat() * 2 - 1
-    })
+    fun vecFor(s: String): FloatArray =
+        norm(
+            FloatArray(vecDim) {
+                Random(s.hashCode().toLong() * 31 + it).nextFloat() * 2 - 1
+            },
+        )
 
     fun vecForBytes(b: ByteArray): FloatArray = vecFor(b.contentHashCode().toString())
 
@@ -34,7 +37,11 @@ class FakeBackend(val vecDim: Int = 512, val delayMs: Long = 0) : EmbedBackend {
         return v
     }
 
-    private fun <T, R> guarded(input: List<T>, seen: MutableList<T>, map: (T) -> R): List<R> {
+    private fun <T, R> guarded(
+        input: List<T>,
+        seen: MutableList<T>,
+        map: (T) -> R,
+    ): List<R> {
         calls.incrementAndGet()
         val cur = active.incrementAndGet()
         maxActive.accumulateAndGet(cur, Math::max)
@@ -47,18 +54,14 @@ class FakeBackend(val vecDim: Int = 512, val delayMs: Long = 0) : EmbedBackend {
         }
     }
 
-    override fun embedTexts(texts: List<String>): List<FloatArray> =
-        guarded(texts, seenTexts, ::vecFor)
+    override fun embedTexts(texts: List<String>): List<FloatArray> = guarded(texts, seenTexts, ::vecFor)
 
-    override fun embedImages(blobs: List<ByteArray>): List<FloatArray> =
-        guarded(blobs, seenImages, ::vecForBytes)
+    override fun embedImages(blobs: List<ByteArray>): List<FloatArray> = guarded(blobs, seenImages, ::vecForBytes)
 
-    override fun embedAudio(windows: List<ByteArray>): List<FloatArray> =
-        guarded(windows, seenAudio, ::vecForBytes)
+    override fun embedAudio(windows: List<ByteArray>): List<FloatArray> = guarded(windows, seenAudio, ::vecForBytes)
 }
 
 class EmbedderTest {
-
     private fun normOf(v: FloatArray): Double {
         var sum = 0.0
         for (x in v) sum += (x * x).toDouble()
@@ -115,9 +118,10 @@ class EmbedderTest {
     fun `concurrent calls are serialised behind one lock`() {
         val fake = FakeBackend(delayMs = 10)
         val embedder = Embedder(fake, dim = 256)
-        val threads = List(8) { i ->
-            Thread { repeat(5) { embedder.embedQuery("q$i-$it") } }
-        }
+        val threads =
+            List(8) { i ->
+                Thread { repeat(5) { embedder.embedQuery("q$i-$it") } }
+            }
         threads.forEach { it.start() }
         threads.forEach { it.join(10_000) }
         assertTrue(threads.none { it.isAlive }, "threads must finish")

@@ -10,8 +10,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ChunkTest {
-
-    private fun zipBytes(entryName: String, content: String): ByteArray {
+    private fun zipBytes(
+        entryName: String,
+        content: String,
+    ): ByteArray {
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->
             zip.putNextEntry(ZipEntry(entryName))
@@ -56,8 +58,9 @@ class ChunkTest {
 
     @Test
     fun `html strips scripts styles and tags and unescapes entities`() {
-        val html = "<html><head><style>p{color:red}</style><script>alert(1)</script></head>" +
-            "<body><p>Fish &amp; chips &lt;3 &quot;yum&quot; &#39;yes&#39;</p></body></html>"
+        val html =
+            "<html><head><style>p{color:red}</style><script>alert(1)</script></head>" +
+                "<body><p>Fish &amp; chips &lt;3 &quot;yum&quot; &#39;yes&#39;</p></body></html>"
         assertEquals("Fish & chips <3 \"yum\" 'yes'", extractText(DocFormat.HTML, html.toByteArray(Charsets.UTF_8)))
     }
 
@@ -69,8 +72,9 @@ class ChunkTest {
 
     @Test
     fun `docx keeps space across paragraphs`() {
-        val xml = "<?xml version=\"1.0\"?><w:document><w:body>" +
-            "<w:p><w:t>Fish</w:t></w:p><w:p><w:t>chips</w:t></w:p></w:body></w:document>"
+        val xml =
+            "<?xml version=\"1.0\"?><w:document><w:body>" +
+                "<w:p><w:t>Fish</w:t></w:p><w:p><w:t>chips</w:t></w:p></w:body></w:document>"
         val text = extractText(DocFormat.DOCX, zipBytes("word/document.xml", xml))
         assertTrue(text.contains("Fish chips"), "merged paragraphs: '$text'")
     }

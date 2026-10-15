@@ -12,6 +12,7 @@ import java.text.Normalizer
 object SearchText {
     private const val TATWEEL = 'ـ' // U+0640
     private const val HARAKAT_FIRST = 'ً' // U+064B
+
     // Harakat run U+064B..U+0655 (fatha..hamza-below) + U+0670 superscript alef.
     private const val HARAKAT_LAST_CODE = 0x0655
     private const val SUPERSCRIPT_ALEF_CODE = 0x0670
@@ -53,8 +54,7 @@ object SearchText {
      * True when the text carries real words (>= 20% letters, Char.isLetter so
      * every script counts). Below that the row is keyword-only, no vector.
      */
-    fun hasWords(s: String): Boolean =
-        s.any { !it.isWhitespace() } && letterFraction(s) >= 0.2
+    fun hasWords(s: String): Boolean = s.any { !it.isWhitespace() } && letterFraction(s) >= 0.2
 
     /**
      * True for codes/numbers only: no letters at all, letter-sparse text, or
@@ -71,7 +71,11 @@ object SearchText {
                 spaced = true
             } else {
                 nonSpace++
-                if (c.isLetter()) letters++ else if (c.isDigit()) digits++
+                if (c.isLetter()) {
+                    letters++
+                } else if (c.isDigit()) {
+                    digits++
+                }
             }
         }
         if (nonSpace == 0) return false

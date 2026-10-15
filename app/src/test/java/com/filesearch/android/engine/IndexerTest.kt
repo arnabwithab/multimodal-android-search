@@ -6,7 +6,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class IndexerTest {
-
     @Test
     fun `image-ish kinds batch eight files per job`() {
         for (kind in listOf("image", "screenshot", "frame", "page_image")) {
@@ -36,12 +35,13 @@ class IndexerTest {
 
     @Test
     fun `inferBatch maps every arch segment kind`() {
-        val cases = mapOf(
-            "text" to 16, "chunk" to 16, "page" to 16, "ocr" to 16, "name" to 16,
-            "image" to 4, "page_image" to 4, "frame" to 4, "screenshot" to 4,
-            "audio" to 2,
-            "none" to 1, "whatever" to 1,
-        )
+        val cases =
+            mapOf(
+                "text" to 16, "chunk" to 16, "page" to 16, "ocr" to 16, "name" to 16,
+                "image" to 4, "page_image" to 4, "frame" to 4, "screenshot" to 4,
+                "audio" to 2,
+                "none" to 1, "whatever" to 1,
+            )
         for ((kind, expected) in cases) {
             assertEquals(expected, inferBatch(kind), "kind=$kind")
         }
@@ -99,8 +99,9 @@ class IndexerTest {
     @Test
     fun `order follows screenshots images pdfs docs audio video`() {
         val queue = IndexQueue()
-        val input = listOf("video", "audio", "doc", "pdf", "image", "screenshot")
-            .map { QueueItem("$it.dat", it) }
+        val input =
+            listOf("video", "audio", "doc", "pdf", "image", "screenshot")
+                .map { QueueItem("$it.dat", it) }
         assertEquals(
             listOf("screenshot", "image", "pdf", "doc", "audio", "video"),
             queue.order(input).map { it.kind },
@@ -110,12 +111,13 @@ class IndexerTest {
     @Test
     fun `order is stable within a rank and keeps unknowns last`() {
         val queue = IndexQueue()
-        val input = listOf(
-            QueueItem("odd.dat", "whatever"),
-            QueueItem("a.jpg", "image"),
-            QueueItem("myst.dat", "mystery"),
-            QueueItem("b.jpg", "image"),
-        )
+        val input =
+            listOf(
+                QueueItem("odd.dat", "whatever"),
+                QueueItem("a.jpg", "image"),
+                QueueItem("myst.dat", "mystery"),
+                QueueItem("b.jpg", "image"),
+            )
         assertEquals(
             listOf("a.jpg", "b.jpg", "odd.dat", "myst.dat"),
             queue.order(input).map { it.path },
@@ -133,10 +135,11 @@ class IndexerTest {
     @Test
     fun `every known kind ranks ahead of unknown`() {
         val queue = IndexQueue()
-        val input = listOf(
-            "video", "text", "frame", "audio", "ocr", "doc", "chunk",
-            "page", "pdf", "page_image", "image", "screenshot", "name", "whatever",
-        ).map { QueueItem("$it.dat", it) }
+        val input =
+            listOf(
+                "video", "text", "frame", "audio", "ocr", "doc", "chunk",
+                "page", "pdf", "page_image", "image", "screenshot", "name", "whatever",
+            ).map { QueueItem("$it.dat", it) }
         assertEquals(
             listOf(
                 "screenshot", "page_image", "image", "page", "pdf", "text", "ocr",

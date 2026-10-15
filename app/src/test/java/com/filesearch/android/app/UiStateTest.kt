@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class UiStateTest {
-
     // formatLoc
 
     @Test
@@ -97,8 +96,10 @@ class UiStateTest {
 
     // SearchUiState
 
-    private fun row(name: String, strong: Boolean) =
-        ResultRow(name, "page", "ex", "p.1", strong, name)
+    private fun row(
+        name: String,
+        strong: Boolean,
+    ) = ResultRow(name, "page", "ex", "p.1", strong, name)
 
     @Test
     fun `collapsed hides weak rows`() {
@@ -219,7 +220,7 @@ class UiStateTest {
     @Test
     fun `wipe summary names models index and transcripts`() {
         val s = SettingsState(listOf("Docs"), emptyList(), false, true, false, false)
-        val w = s.wipeSummary().lowercase()
+        val w = s.wipeSummary.lowercase()
         assertTrue("model" in w)
         assertTrue("index" in w)
         assertTrue("transcript" in w)

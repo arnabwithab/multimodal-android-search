@@ -6,7 +6,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PowerTest {
-
     @Test
     fun `all guards true resolves to thermal first`() {
         assertEquals(

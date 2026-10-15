@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class VideoTest {
-
     @Test
     fun `ahash of identical arrays is equal`() {
         val gray = ByteArray(64) { it.toByte() }

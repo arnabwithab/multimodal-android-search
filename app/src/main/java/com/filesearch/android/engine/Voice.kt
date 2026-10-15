@@ -16,7 +16,10 @@ data class VoiceConfig(
 }
 
 /** "heard: …" confirmation plus language chip for the search bar (arch §7 input). */
-fun heardLabel(transcript: String, langTag: String): String = "heard: $transcript [$langTag]"
+fun heardLabel(
+    transcript: String,
+    langTag: String,
+): String = "heard: $transcript [$langTag]"
 
 /**
  * Cloud transcript row (arch §7 boost): IndexStore writes these as extra kind=chunk
@@ -29,7 +32,10 @@ data class TranscriptRow(
 )
 
 /** Build one transcript boost row for [fileId] (arch §7: extra chunk FTS row). */
-fun transcriptRow(text: String, fileId: Long): TranscriptRow = TranscriptRow(fileId = fileId, text = text)
+fun transcriptRow(
+    text: String,
+    fileId: Long,
+): TranscriptRow = TranscriptRow(fileId = fileId, text = text)
 
 /**
  * FileIds whose transcript rows the device must delete when the cloud toggle flips
@@ -56,4 +62,7 @@ class CostMeter(var millisUsed: Long = 0) {
  * On device, on-device STT is tried first; cloud failure never blocks search.
  */
 @Suppress("UNUSED_PARAMETER")
-fun queryFallback(cloudFailed: Boolean, typed: String): String = typed
+fun queryFallback(
+    cloudFailed: Boolean,
+    typed: String,
+): String = typed

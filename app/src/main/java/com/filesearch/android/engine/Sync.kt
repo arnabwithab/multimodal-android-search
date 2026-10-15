@@ -1,7 +1,9 @@
 package com.filesearch.android.engine
 
 data class StoredFile(val path: String, val inode: Long, val size: Long, val mtime: Long)
+
 data class MovedFile(val oldPath: String, val entry: CrawlEntry)
+
 data class SyncResult(
     val added: List<CrawlEntry>,
     val modified: List<CrawlEntry>,

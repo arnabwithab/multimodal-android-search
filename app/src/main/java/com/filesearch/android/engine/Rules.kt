@@ -17,20 +17,29 @@ object Rules {
 
     private val secretExts = setOf("pem", "key", "p12", "pfx", "jks", "keystore", "asc")
     private val imageExts = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "heif", "avif")
-    private val mediaExts = imageExts + setOf(
-        "mp4", "mkv", "mov", "webm", "avi", "mts", "m2ts", "3gp",
-        "mp3", "wav", "ogg", "opus", "m4a", "flac", "aac",
-    )
+    private val mediaExts =
+        imageExts +
+            setOf(
+                "mp4", "mkv", "mov", "webm", "avi", "mts", "m2ts", "3gp",
+                "mp3", "wav", "ogg", "opus", "m4a", "flac", "aac",
+            )
     private val vendoredDirs = setOf("node_modules", ".venv", "vendor", "build")
 
-    fun classify(path: String, size: Long, isHidden: Boolean, isCloudPlaceholder: Boolean): FileDecision {
+    fun classify(
+        path: String,
+        size: Long,
+        isHidden: Boolean,
+        isCloudPlaceholder: Boolean,
+    ): FileDecision {
         val norm = path.replace('\\', '/')
         val segs = norm.split('/').map { it.lowercase() }
         val name = segs.lastOrNull().orEmpty()
         val ext = name.substringAfterLast('.', "")
         if (ext in secretExts || name == ".env" || name.startsWith(".env.") ||
             name.endsWith(".env") || "password" in name
-        ) return FileDecision.SKIP_SECRET
+        ) {
+            return FileDecision.SKIP_SECRET
+        }
         if (segs.any { it in vendoredDirs }) return FileDecision.SKIP_VENDORED
         // dot segments cover .cache and hidden files; Android/data is the app-private dir.
         if (isHidden || segs.any { it.startsWith(".") } || "android/data" in norm.lowercase()) {
@@ -50,8 +59,7 @@ object Rules {
     }
 
     /** Media extensions only — a dir of 300 machine-named logs is data, not a dataset. */
-    fun isMediaName(name: String): Boolean =
-        name.substringAfterLast('.', "").lowercase(java.util.Locale.ROOT) in mediaExts
+    fun isMediaName(name: String): Boolean = name.substringAfterLast('.', "").lowercase(java.util.Locale.ROOT) in mediaExts
 
     fun isDatasetDir(fileCountMachineNamed: Int): Boolean = fileCountMachineNamed >= DATASET_MIN_COUNT
 }

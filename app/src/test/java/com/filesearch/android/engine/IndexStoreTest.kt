@@ -11,18 +11,36 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class IndexStoreTest {
+    private fun open(
+        dir: File,
+        name: String = "idx-${System.nanoTime()}.sqlite",
+    ): IndexStore = IndexStore(File(dir, name).absolutePath)
 
-    private fun open(dir: File, name: String = "idx-${System.nanoTime()}.sqlite"): IndexStore =
-        IndexStore(File(dir, name).absolutePath)
-
-    private fun fileId(store: IndexStore, path: String, kind: String = "doc"): Long =
-        store.upsertFile(path = path, kind = kind, size = 100, mtime = 1, inode = 42, device = 7)
+    private fun fileId(
+        store: IndexStore,
+        path: String,
+        kind: String = "doc",
+    ): Long = store.upsertFile(path = path, kind = kind, size = 100, mtime = 1, inode = 42, device = 7)
 
     @Test
-    fun `insert plus segments round-trips with fts match on body`(@TempDir dir: File) {
+    fun `insert plus segments round-trips with fts match on body`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             val id = fileId(store, "/a/note.txt")
-            val s1 = store.addSegment(id, "chunk", "text", 0.0, 1.0, "quick fox", null, "note.txt", "the quick brown fox", "the quick brown fox")
+            val s1 =
+                store.addSegment(
+                    id,
+                    "chunk",
+                    "text",
+                    0.0,
+                    1.0,
+                    "quick fox",
+                    null,
+                    "note.txt",
+                    "the quick brown fox",
+                    "the quick brown fox",
+                )
             val s2 = store.addSegment(id, "chunk", "text", 1.0, 2.0, "slow dog", null, "note.txt", "a slow lazy dog", "a slow lazy dog")
             assertTrue(store.matchTerms("body : quick").contains(s1))
             assertFalse(store.matchTerms("body : quick").contains(s2))
@@ -31,7 +49,9 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `move re-path keeps segments and fts hits`(@TempDir dir: File) {
+    fun `move re-path keeps segments and fts hits`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             val id = fileId(store, "/a/photo.jpg", "image")
             store.addSegment(id, "name", "none", null, null, "beach sunset", null, "photo.jpg", "beach sunset", "beach sunset")
@@ -43,10 +63,23 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `delete cascades segments and fts`(@TempDir dir: File) {
+    fun `delete cascades segments and fts`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             val id = fileId(store, "/gone.txt")
-            store.addSegment(id, "chunk", "text", null, null, "vanishing words", null, "gone.txt", "vanishing words here", "vanishing words here")
+            store.addSegment(
+                id,
+                "chunk",
+                "text",
+                null,
+                null,
+                "vanishing words",
+                null,
+                "gone.txt",
+                "vanishing words here",
+                "vanishing words here",
+            )
             assertTrue(store.deleteFile("/gone.txt"))
             assertEquals(0, store.countSegments(id))
             assertTrue(store.matchTerms("body : vanishing").isEmpty())
@@ -55,7 +88,9 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `pruneMissing deletes only paths outside the known set`(@TempDir dir: File) {
+    fun `pruneMissing deletes only paths outside the known set`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             fileId(store, "/keep1.txt")
             fileId(store, "/keep2.txt")
@@ -68,7 +103,9 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `pending orders screenshots first through video last`(@TempDir dir: File) {
+    fun `pending orders screenshots first through video last`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             for (k in listOf("video", "audio", "doc", "pdf", "image", "screenshot")) {
                 store.upsertFile("/f.$k", k, 100, 1, k.hashCode().toLong(), 7)
@@ -80,7 +117,9 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `upsert keeps done state when fingerprint unchanged, pending when changed`(@TempDir dir: File) {
+    fun `upsert keeps done state when fingerprint unchanged, pending when changed`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             store.upsertFile("/a.txt", "doc", 100, 1, 42, 7, state = "done")
             store.upsertFile("/a.txt", "doc", 100, 1, 42, 7)
@@ -91,7 +130,9 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `move onto existing path returns false instead of throwing`(@TempDir dir: File) {
+    fun `move onto existing path returns false instead of throwing`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             fileId(store, "/a.txt")
             fileId(store, "/b.txt")
@@ -100,7 +141,9 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `upsert same path updates state without duplicates`(@TempDir dir: File) {
+    fun `upsert same path updates state without duplicates`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             fileId(store, "/a.txt")
             store.upsertFile("/a.txt", "doc", 100, 2, 42, 7, state = "done")
@@ -110,7 +153,9 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `fingerprint match returns true and keeps data`(@TempDir dir: File) {
+    fun `fingerprint match returns true and keeps data`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             fileId(store, "/a.txt")
             val fp = Fingerprint("embgemma2@r1 cpu fp16 256 budgets1")
@@ -122,7 +167,9 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `fingerprint mismatch resets index and returns false`(@TempDir dir: File) {
+    fun `fingerprint mismatch resets index and returns false`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             val id = fileId(store, "/a.txt")
             store.addSegment(id, "chunk", "text", null, null, "old", null, "a.txt", "old words", "old words")
@@ -135,16 +182,32 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `bengali word matches fts with no language gate`(@TempDir dir: File) {
+    fun `bengali word matches fts with no language gate`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             val id = fileId(store, "/notes/bn.txt")
-            val seg = store.addSegment(id, "chunk", "text", null, null, "বাংলা নোট", null, "bn.txt", "আমার বাংলা নোট খুঁজুন", "আমার বাংলা নোট খুঁজুন")
+            val seg =
+                store.addSegment(
+                    id,
+                    "chunk",
+                    "text",
+                    null,
+                    null,
+                    "বাংলা নোট",
+                    null,
+                    "bn.txt",
+                    "আমার বাংলা নোট খুঁজুন",
+                    "আমার বাংলা নোট খুঁজুন",
+                )
             assertTrue(store.matchTerms("বাংলা").contains(seg))
         }
     }
 
     @Test
-    fun `fts uses the unicode61 tokenizer from arch schema`(@TempDir dir: File) {
+    fun `fts uses the unicode61 tokenizer from arch schema`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             DriverManager.getConnection("jdbc:sqlite:${store.dbPath}").use { c ->
                 c.createStatement().use { st ->
@@ -160,7 +223,9 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `foreign keys are enforced on segments`(@TempDir dir: File) {
+    fun `foreign keys are enforced on segments`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             assertThrows<SQLException> {
                 store.addSegment(999999, "chunk", "text", null, null, "orphan", null, "x", "orphan body", "orphan body")
@@ -169,7 +234,9 @@ class IndexStoreTest {
     }
 
     @Test
-    fun `unfinishedCounts covers two-pass math`(@TempDir dir: File) {
+    fun `unfinishedCounts covers two-pass math`(
+        @TempDir dir: File,
+    ) {
         open(dir).use { store ->
             store.upsertFile("/p1.txt", "pdf", 100, 1, 1, 7, state = "pending")
             store.upsertFile("/p2.txt", "pdf", 100, 1, 2, 7, state = "partial")

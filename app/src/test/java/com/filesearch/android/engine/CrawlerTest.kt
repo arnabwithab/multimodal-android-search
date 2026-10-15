@@ -7,8 +7,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CrawlerTest {
-
-    private fun makeFile(dir: File, rel: String, size: Int = 2048): File {
+    private fun makeFile(
+        dir: File,
+        rel: String,
+        size: Int = 2048,
+    ): File {
         val f = File(dir, rel)
         f.parentFile.mkdirs()
         f.writeBytes(ByteArray(size) { 'x'.code.toByte() })
@@ -19,7 +22,20 @@ class CrawlerTest {
 
     @Test
     fun `secret key material and env files are skipped`() {
-        for (name in listOf("id.pem", "id.key", "cert.p12", "key.pfx", "debug.keystore", ".env", "a/.env.local", "passwords.txt", "my-Password-backup.csv")) {
+        for (
+        name in
+        listOf(
+            "id.pem",
+            "id.key",
+            "cert.p12",
+            "key.pfx",
+            "debug.keystore",
+            ".env",
+            "a/.env.local",
+            "passwords.txt",
+            "my-Password-backup.csv",
+        )
+        ) {
             assertEquals(FileDecision.SKIP_SECRET, Rules.classify("/root/$name", 5000, false, false), name)
         }
         assertEquals(FileDecision.INDEX, Rules.classify("/root/notes.txt", 5000, false, false))
@@ -67,7 +83,9 @@ class CrawlerTest {
     // ---- Crawler: walk ----
 
     @Test
-    fun `walk indexes normal and multilingual files, skips the rest`(@TempDir root: File) {
+    fun `walk indexes normal and multilingual files, skips the rest`(
+        @TempDir root: File,
+    ) {
         makeFile(root, "notes.txt")
         makeFile(root, "নোট-বাংলা.txt")
         makeFile(root, "ملاحظة-عربية.txt")
@@ -98,7 +116,9 @@ class CrawlerTest {
     }
 
     @Test
-    fun `walk flags machine-named dir as dataset candidate`(@TempDir root: File) {
+    fun `walk flags machine-named dir as dataset candidate`(
+        @TempDir root: File,
+    ) {
         val ds = File(root, "dataset")
         for (i in 1..300) makeFile(root, "dataset/%06d.jpg".format(i), 2048)
         makeFile(root, "keep.txt")
@@ -110,7 +130,9 @@ class CrawlerTest {
     }
 
     @Test
-    fun `walk ignores machine-named non-media files for dataset check`(@TempDir root: File) {
+    fun `walk ignores machine-named non-media files for dataset check`(
+        @TempDir root: File,
+    ) {
         for (i in 1..300) makeFile(root, "logs/%06d.log".format(i), 2048)
         val crawler = Crawler()
         val found = crawler.walk(root).map { it.path }
@@ -126,7 +148,9 @@ class CrawlerTest {
     }
 
     @Test
-    fun `walk inode is stable across passes`(@TempDir root: File) {
+    fun `walk inode is stable across passes`(
+        @TempDir root: File,
+    ) {
         makeFile(root, "a.txt")
         val crawler = Crawler()
         val first = crawler.walk(root).associateBy({ it.path }, { it.inode })

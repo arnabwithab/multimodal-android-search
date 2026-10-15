@@ -3,12 +3,12 @@
   "last_updated": "2026-10-15",
   "summary": {
     "total": 14,
-    "completed": 8,
+    "completed": 9,
     "in_progress": 0,
-    "planned": 6,
-    "tests_passing": 123,
+    "planned": 5,
+    "tests_passing": 149,
     "tests_failing": 0,
-    "tests_missing": 6
+    "tests_missing": 5
   },
   "features": [
     {
@@ -167,7 +167,7 @@
         "files": [
           "app/src/test/java/com/digup/android/engine/IndexStoreTest.kt"
         ],
-        "notes": "14 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; exact arch §5 FTS5 tokenizer verified on bundled SQLite"
+        "notes": "14 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; exact arch \u00a75 FTS5 tokenizer verified on bundled SQLite"
       },
       "subtasks": [],
       "notes": "",
@@ -177,22 +177,24 @@
     {
       "id": "F008",
       "name": "Searcher fusion",
-      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, ≥6 scripts in evals.",
-      "status": "planned",
+      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, \u22656 scripts in evals.",
+      "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
       "design_doc": "docs/design.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
+          "app/src/test/java/com/digup/android/engine/VectorsTest.kt",
+          "app/src/test/java/com/digup/android/engine/SearchTextTest.kt",
           "app/src/test/java/com/digup/android/engine/SearcherTest.kt"
         ],
-        "notes": "make eval R@1 gate"
+        "notes": "26 tests green via make test (Vectors 7, SearchText 9, Searcher 10); greptile-reviewed, fixes re-reviewed PASS; eval R@1 gate waits on F013 Embedder"
       },
       "subtasks": [],
       "notes": "",
       "added": "2026-10-14",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F009",
@@ -268,7 +270,7 @@
     {
       "id": "F012",
       "name": "Model manager + SoC picker",
-      "description": "Staged download (270M→440M→740M), per-SoC AOT select, SHA verify, reference-vector gate.",
+      "description": "Staged download (270M\u2192440M\u2192740M), per-SoC AOT select, SHA verify, reference-vector gate.",
       "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",

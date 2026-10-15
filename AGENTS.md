@@ -14,7 +14,7 @@ Design truth: `docs/design.md` (behaviour, UX, privacy) and `docs/architecture.m
 - Thin UI — logic lives in `engine/`; Compose screens never embed, decode, or query directly.
 - Explicit over clever — readable code beats smart code.
 - If it isn't runnable via `make`, it isn't done.
-- After every feature run finishes, push to git.
+- Checkpoint commits + push: commit and `git push` at intervals — after each passing `make test` / `make style`, after each feature/subtask, and before switching tasks. Run greptile-reviewer on the feature diff before each push. Never end a run or session with unpushed work.
 - Logic + ranking must pass on Linux before touching a phone; if the phone disagrees, the phone wins (re-budget, don't argue).
 
 ## Tech Stack
@@ -114,7 +114,7 @@ When `docs/features.json` holds 3+ independent features (different modules, no s
 1. **Plan**: Identify independent features from `features.json`. Same-file features batch sequentially.
 2. **Build**: Up to 3 builder subagents at a time. When one completes, spawn the next pending feature.
 3. **E2E** (if applicable): device/emulator instrumented tests after all builders complete.
-4. **Review**: ponytail-reviewer audits the combined diff for over-engineering (full picture only, not per-feature).
+4. **Review**: greptile-reviewer reviews each completed feature diff before its checkpoint push; plus ponytail-reviewer audits the combined diff every 3–4 features.
 5. **Verify**: `make test && make style` (Linux gate) + `make eval` ranking gate.
 
 Fewer than 3 independent features: implement directly, no subagents.
@@ -127,12 +127,13 @@ Defined in `~/.config/opencode/agents/`, all `model: opencode-go/deepseek-v4-fla
 |-------|------|---------|-------------|
 | builder | `builder.md` | TDD one feature, tests then implementation | edit: allow, bash: allow, task: { \*: deny, playwright-tester: allow } |
 | playwright-tester | `playwright-tester.md` | E2E via playwright-cli (only if a web companion exists; else instrumented tests) | edit: deny, bash: allow |
-| ponytail-reviewer | `ponytail-reviewer.md` | Bloat audit on combined diff | edit: deny, bash: allow |
+| greptile-reviewer | `greptile-reviewer.md` | Adversarial review per-feature (pre-push gate) | edit: deny, bash: allow |
+| ponytail-reviewer | `ponytail-reviewer.md` | Bloat audit on combined diff every 3–4 features | edit: deny, bash: allow |
 
 ### Edge cases
 
 - **Dependent features** (same files): sequenced in one builder.
-- **Ponytail finds issues**: main agent decides fix-now vs file-as-debt (`shortcut:` comment).
+- **Greptile / ponytail finds issues**: main agent decides fix-now vs file-as-debt (`shortcut:` comment).
 - **No E2E defined**: device-test step skipped, JVM + eval gates still required.
 - **Ranking regression**: any `make eval` R@1 drop blocks merge, even if unit tests pass.
 

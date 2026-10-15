@@ -1,0 +1,14 @@
+[
+  {"id": "q01", "query": "sunset photo at the beach", "lang": "en", "expect_doc_contains": "beach"},
+  {"id": "q02", "query": "factura del restaurante de Madrid", "lang": "es", "expect_doc_contains": "factura"},
+  {"id": "q03", "query": "সমুদ্র সৈকতে সূর্যাস্তের ছবি", "lang": "bn", "expect_doc_contains": "সমুদ্র"},
+  {"id": "q04", "query": "ঢাকার রেস্টুরেন্টের বিল", "lang": "bn", "expect_doc_contains": "বিল"},
+  {"id": "q05", "query": "صورة غروب الشمس على الشاطئ", "lang": "ar", "expect_doc_contains": "الشاطئ"},
+  {"id": "q06", "query": "فاتورة مطعم القاهرة", "lang": "ar", "expect_doc_contains": "فاتورة"},
+  {"id": "q07", "query": "समुद्र तट पर सूर्यास्त की तस्वीर", "lang": "hi", "expect_doc_contains": "समुद्र"},
+  {"id": "q08", "query": "海滩日落照片", "lang": "zh", "expect_doc_contains": "海滩"},
+  {"id": "q09", "query": "ビーチの夕日の写真", "lang": "ja", "expect_doc_contains": "ビーチ"},
+  {"id": "q10", "query": "รูปพระอาทิตย์ตกที่ชายหาด", "lang": "th", "expect_doc_contains": "ชายหาด"},
+  {"id": "q11", "query": "beach ছবি sunset ছবি", "lang": "mixed", "expect_doc_contains": "beach"},
+  {"id": "q12", "query": "الشاطئ sunset photo সমুদ্র", "lang": "mixed", "expect_doc_contains": "sunset"}
+]

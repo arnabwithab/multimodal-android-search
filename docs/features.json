@@ -3,12 +3,12 @@
   "last_updated": "2026-10-15",
   "summary": {
     "total": 14,
-    "completed": 11,
+    "completed": 12,
     "in_progress": 0,
-    "planned": 3,
-    "tests_passing": 175,
+    "planned": 2,
+    "tests_passing": 182,
     "tests_failing": 0,
-    "tests_missing": 3
+    "tests_missing": 2
   },
   "features": [
     {
@@ -291,21 +291,21 @@
       "id": "F013",
       "name": "Embedder + fingerprint",
       "description": "LiteRT-LM interface embedTexts/embedImages/embedAudio, single-mutex serialisation, MRL 256d truncate+renorm, fingerprint model@rev runtime dtype dim budgets + resetAll.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
           "app/src/test/java/com/digup/android/engine/EmbedderTest.kt"
         ],
-        "notes": "reference-vector gate on device; Linux tests use a fake backend"
+        "notes": "7 tests green via make test; greptile-reviewed, re-reviewed PASS; reference-vector gate needs real .litertlm; eval R@1 SKIP until runner lands"
       },
       "subtasks": [],
       "notes": "",
       "added": "2026-10-15",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F014",

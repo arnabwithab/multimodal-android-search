@@ -1,72 +1,98 @@
 {
   "project": "multimodal-search-for-android",
-  "last_updated": "2026-10-14",
+  "last_updated": "2026-10-15",
   "summary": {
     "total": 12,
-    "completed": 0,
+    "completed": 3,
     "in_progress": 0,
-    "planned": 12,
-    "tests_passing": 0,
+    "planned": 9,
+    "tests_passing": 48,
     "tests_failing": 0,
-    "tests_missing": 12
+    "tests_missing": 9
   },
   "features": [
     {
       "id": "F001",
       "name": "Crawler + sync",
       "description": "Folder walk (metadata only), Rules filter, inode-aware sync/move/prune, dataset detection. All-language file names.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
-        "files": ["app/src/test/java/com/digup/android/engine/CrawlerTest.kt"],
-        "notes": "Linux-safe; temp-dir fixtures"
+        "status": "passing",
+        "files": [
+          "app/src/test/java/com/digup/android/engine/CrawlerTest.kt"
+        ],
+        "notes": "16 tests green via make test. review fixes: move+modify re-embed, media-only dataset count"
       },
       "subtasks": [
-        { "id": "F001-1", "name": "Rules classify + secrets/datasets", "status": "planned" },
-        { "id": "F001-2", "name": "Sync reconcile + move-aware repath", "status": "planned" }
+        {
+          "id": "F001-1",
+          "name": "Rules classify + secrets/datasets",
+          "status": "completed"
+        },
+        {
+          "id": "F001-2",
+          "name": "Sync reconcile + move-aware repath",
+          "status": "completed"
+        }
       ],
-      "notes": "",
+      "notes": "Reviewed pre-push (greptile); P1s fixed. Device parity still needed per test notes.",
       "added": "2026-10-14",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F002",
       "name": "Images + screenshots + OCR",
       "description": "Downscale + EXIF, screenshot detect, ML Kit OCR as FTS-only (no vector).",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
-        "files": ["app/src/test/java/com/digup/android/engine/PrepareTest.kt"],
-        "notes": "OCR gap labelled, image vector still matches"
+        "status": "passing",
+        "files": [
+          "app/src/test/java/com/digup/android/engine/PrepareTest.kt"
+        ],
+        "notes": "14 tests green via make test. review fixes: icon=max-dim rule, RAW MIME/ext, path-dir screenshot"
       },
-      "subtasks": [{ "id": "F002-1", "name": "ImagePrepare sizes + skip rules", "status": "planned" }],
-      "notes": "",
+      "subtasks": [
+        {
+          "id": "F002-1",
+          "name": "ImagePrepare sizes + skip rules",
+          "status": "completed"
+        }
+      ],
+      "notes": "Reviewed pre-push (greptile); P1s fixed. Device parity still needed per test notes.",
       "added": "2026-10-14",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F003",
       "name": "PDF ingestion",
       "description": "PdfiumAndroid text/image per page, glyph-order and lost-letter handling, two-pass long files.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
-        "files": ["app/src/test/java/com/digup/android/engine/PdfTest.kt"],
-        "notes": "Needs device render parity check"
+        "status": "passing",
+        "files": [
+          "app/src/test/java/com/digup/android/engine/PdfTest.kt"
+        ],
+        "notes": "18 tests green via make test. review fixes: twoPass tail cap, 9-script vowel ranges, ZWSP split"
       },
-      "subtasks": [{ "id": "F003-1", "name": "Page classify + render fallback", "status": "planned" }],
-      "notes": "",
+      "subtasks": [
+        {
+          "id": "F003-1",
+          "name": "Page classify + render fallback",
+          "status": "completed"
+        }
+      ],
+      "notes": "Reviewed pre-push (greptile); P1s fixed. Device parity still needed per test notes.",
       "added": "2026-10-14",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F004",
@@ -78,7 +104,9 @@
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "missing",
-        "files": ["app/src/test/java/com/digup/android/engine/ChunkTest.kt"],
+        "files": [
+          "app/src/test/java/com/digup/android/engine/ChunkTest.kt"
+        ],
         "notes": "Deterministic resume across passes"
       },
       "subtasks": [],
@@ -96,7 +124,9 @@
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "missing",
-        "files": ["app/src/test/java/com/digup/android/engine/AudioTest.kt"],
+        "files": [
+          "app/src/test/java/com/digup/android/engine/AudioTest.kt"
+        ],
         "notes": "Linux ffmpeg parity first"
       },
       "subtasks": [],
@@ -114,7 +144,9 @@
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "missing",
-        "files": ["app/src/test/java/com/digup/android/engine/VideoTest.kt"],
+        "files": [
+          "app/src/test/java/com/digup/android/engine/VideoTest.kt"
+        ],
         "notes": "MTS lead-back covered on device"
       },
       "subtasks": [],
@@ -132,7 +164,9 @@
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "missing",
-        "files": ["app/src/test/java/com/digup/android/engine/IndexStoreTest.kt"],
+        "files": [
+          "app/src/test/java/com/digup/android/engine/IndexStoreTest.kt"
+        ],
         "notes": "Robolectric in-memory FTS5"
       },
       "subtasks": [],
@@ -150,7 +184,9 @@
       "design_doc": "docs/design.md",
       "tests": {
         "status": "missing",
-        "files": ["app/src/test/java/com/digup/android/engine/SearcherTest.kt"],
+        "files": [
+          "app/src/test/java/com/digup/android/engine/SearcherTest.kt"
+        ],
         "notes": "make eval R@1 gate"
       },
       "subtasks": [],
@@ -168,7 +204,9 @@
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "missing",
-        "files": ["app/src/androidTest/java/com/digup/android/engine/PowerTest.kt"],
+        "files": [
+          "app/src/androidTest/java/com/digup/android/engine/PowerTest.kt"
+        ],
         "notes": "Device-only"
       },
       "subtasks": [],
@@ -186,12 +224,22 @@
       "design_doc": "docs/design.md",
       "tests": {
         "status": "missing",
-        "files": ["app/src/androidTest/java/com/digup/android/engine/VoiceTest.kt"],
+        "files": [
+          "app/src/androidTest/java/com/digup/android/engine/VoiceTest.kt"
+        ],
         "notes": "Airplane-mode fallback verified on device"
       },
       "subtasks": [
-        { "id": "F010-1", "name": "On-device STT/TTS", "status": "planned" },
-        { "id": "F010-2", "name": "Cloud toggle + transcript rows", "status": "planned" }
+        {
+          "id": "F010-1",
+          "name": "On-device STT/TTS",
+          "status": "planned"
+        },
+        {
+          "id": "F010-2",
+          "name": "Cloud toggle + transcript rows",
+          "status": "planned"
+        }
       ],
       "notes": "",
       "added": "2026-10-14",
@@ -207,7 +255,9 @@
       "design_doc": "docs/design.md",
       "tests": {
         "status": "missing",
-        "files": ["app/src/androidTest/java/com/digup/android/app/SearchTest.kt"],
+        "files": [
+          "app/src/androidTest/java/com/digup/android/app/SearchTest.kt"
+        ],
         "notes": "Paparazzi snapshots + thumb test on phone"
       },
       "subtasks": [],
@@ -225,7 +275,9 @@
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "missing",
-        "files": ["app/src/test/java/com/digup/android/engine/ModelTest.kt"],
+        "files": [
+          "app/src/test/java/com/digup/android/engine/ModelTest.kt"
+        ],
         "notes": "Linux text-signature parity first"
       },
       "subtasks": [],

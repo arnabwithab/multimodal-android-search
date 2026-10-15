@@ -3,12 +3,12 @@
   "last_updated": "2026-10-15",
   "summary": {
     "total": 14,
-    "completed": 7,
+    "completed": 8,
     "in_progress": 0,
-    "planned": 7,
-    "tests_passing": 109,
+    "planned": 6,
+    "tests_passing": 123,
     "tests_failing": 0,
-    "tests_missing": 7
+    "tests_missing": 6
   },
   "features": [
     {
@@ -158,26 +158,26 @@
       "id": "F007",
       "name": "IndexStore + fingerprint",
       "description": "Room/SQLite files+segments+fts, migrations, fingerprint reset, scope support.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
           "app/src/test/java/com/digup/android/engine/IndexStoreTest.kt"
         ],
-        "notes": "Robolectric in-memory FTS5"
+        "notes": "14 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; exact arch §5 FTS5 tokenizer verified on bundled SQLite"
       },
       "subtasks": [],
       "notes": "",
       "added": "2026-10-14",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F008",
       "name": "Searcher fusion",
-      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, \u22656 scripts in evals.",
+      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, ≥6 scripts in evals.",
       "status": "planned",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
@@ -268,7 +268,7 @@
     {
       "id": "F012",
       "name": "Model manager + SoC picker",
-      "description": "Staged download (270M\u2192440M\u2192740M), per-SoC AOT select, SHA verify, reference-vector gate.",
+      "description": "Staged download (270M→440M→740M), per-SoC AOT select, SHA verify, reference-vector gate.",
       "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",

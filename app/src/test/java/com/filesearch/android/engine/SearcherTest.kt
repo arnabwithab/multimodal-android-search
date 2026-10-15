@@ -143,4 +143,14 @@ class SearcherTest {
             Searcher.fuse(listOf(cand(1, vec = floatArrayOf(1f, 0f))), floatArrayOf(1f, 0f, 0f, 0f))
         }
     }
+
+    @Test
+    fun `cand equality ignores vec so sets dedupe`() {
+        val a = cand(1, vec = floatArrayOf(1f, 0f, 0f, 0f), coverage = 0.5)
+        val b = cand(1, vec = floatArrayOf(0f, 1f, 0f, 0f), coverage = 0.5)
+        assertEquals(a, b)
+        assertEquals(a.hashCode(), b.hashCode())
+        assertEquals(1, setOf(a, b).size)
+        assertEquals(1, listOf(a, b).distinct().size)
+    }
 }

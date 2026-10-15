@@ -3,11 +3,117 @@ package com.filesearch.android.engine
 import java.sql.DriverManager
 import java.sql.SQLException
 
-/** Fingerprint `model@rev runtime dtype dim budgets`; any change forces full re-embed (never mix dims).
- * shortcut: opaque string until Embedder lands; structured fields then. */
-data class Fingerprint(val text: String)
+/** Fingerprint `model@rev runtime dtype dim budgets`; any change forces full re-embed (never mix dims). */
+data class Fingerprint(
+    val model: String,
+    val rev: String,
+    val runtime: String,
+    val dtype: String,
+    val dim: Int,
+    val budgets: String,
+) {
+    override fun toString(): String = "$model@$rev $runtime $dtype $dim $budgets"
+
+    /** Single-string form for callers holding the stored text (e.g. older tests). */
+    constructor(text: String) : this(
+        parse(text)?.model ?: throw IllegalArgumentException("malformed fingerprint: $text"),
+        parse(text)?.rev ?: throw IllegalArgumentException("malformed fingerprint: $text"),
+        parse(text)?.runtime ?: throw IllegalArgumentException("malformed fingerprint: $text"),
+        parse(text)?.dtype ?: throw IllegalArgumentException("malformed fingerprint: $text"),
+        parse(text)?.dim ?: throw IllegalArgumentException("malformed fingerprint: $text"),
+        parse(text)?.budgets ?: throw IllegalArgumentException("malformed fingerprint: $text"),
+    )
+
+    companion object {
+        private const val FINGERPRINT_PART_COUNT = 5
+        private const val HEAD_PART = 0
+        private const val RUNTIME_PART = 1
+        private const val DTYPE_PART = 2
+        private const val DIM_PART = 3
+        private const val BUDGETS_PART = 4
+
+        fun parse(text: String): Fingerprint? {
+            val parts = text.split(" ")
+            if (parts.size != FINGERPRINT_PART_COUNT || parts.any { it.isEmpty() }) return null
+            return fromParts(parts)
+        }
+
+        private fun fromParts(parts: List<String>): Fingerprint? {
+            val modelRev = splitModelRev(parts[HEAD_PART])
+            val dim = parts[DIM_PART].toIntOrNull()?.takeIf { it > 0 }
+            if (modelRev == null || dim == null) return null
+            return Fingerprint(modelRev.first, modelRev.second, parts[RUNTIME_PART], parts[DTYPE_PART], dim, parts[BUDGETS_PART])
+        }
+
+        private fun splitModelRev(head: String): Pair<String, String>? {
+            val at = head.indexOf('@')
+            if (at <= 0 || at == head.length - 1) return null
+            return head.substring(0, at).takeIf { it.isNotEmpty() }?.let { model ->
+                head.substring(at + 1).takeIf { it.isNotEmpty() }?.let { model to it }
+            }
+        }
+    }
+}
 
 data class PendingFile(val id: Long, val path: String, val kind: String, val state: String)
+
+// Positional bind indices for the upsertFile statement.
+private const val BIND_PATH = 1
+private const val BIND_KIND = 2
+private const val BIND_SIZE = 3
+private const val BIND_MTIME = 4
+private const val BIND_INODE = 5
+private const val BIND_DEVICE = 6
+private const val BIND_STATE = 7
+private const val BIND_DETAIL = 8
+private const val BIND_INFO = 9
+private const val BIND_INDEXED_AT = 10
+
+// Positional bind indices for the segment + FTS inserts.
+private const val SEG_BIND_FILE = 1
+private const val SEG_BIND_KIND = 2
+private const val SEG_BIND_MODALITY = 3
+private const val SEG_BIND_LOC = 4
+private const val SEG_BIND_LOC_END = 5
+private const val SEG_BIND_EXCERPT = 6
+private const val SEG_BIND_VEC = 7
+private const val FTS_BIND_ROWID = 1
+private const val FTS_BIND_NAME = 2
+private const val FTS_BIND_BODY = 3
+private const val FTS_BIND_ORIGINAL = 4
+
+// SELECT id,path,kind,state column positions in pending().
+private const val PENDING_COL_ID = 1
+private const val PENDING_COL_PATH = 2
+private const val PENDING_COL_KIND = 3
+private const val PENDING_COL_STATE = 4
+
+/** One file row: identity carries the inode so Sync can re-path moves without re-embed. */
+data class FileRow(
+    val path: String,
+    val kind: String,
+    val size: Long,
+    val mtime: Long,
+    val inode: Long,
+    val device: Long,
+    val state: String = "pending",
+    val detail: String? = null,
+    val info: String? = null,
+)
+
+/** One segment plus its FTS text, inserted in a single transaction. */
+data class SegmentRow(
+    val fileId: Long,
+    val kind: String,
+    val modality: String,
+    val loc: Double?,
+    val locEnd: Double?,
+    val excerpt: String?,
+    val vec: ByteArray?,
+    val name: String,
+    val body: String,
+    val original: String,
+)
 
 /**
  * SQLite index: files + segments + FTS5 + meta. Device maps these tables to Room @Entity
@@ -34,8 +140,8 @@ class IndexStore(val dbPath: String) : AutoCloseable {
                 "CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(name, body, " +
                     "original UNINDEXED, tokenize=\"porter unicode61 remove_diacritics 2 categories 'L* N* Co M*'\")",
             )
-        } catch (e: Exception) {
-            // shortcut: older SQLite without remove_diacritics/categories args; upgrade when min SQLite is known.
+        } catch (_: SQLException) {
+            // Old SQLite without remove_diacritics 2 / categories args: fall back to plain porter+unicode61.
             exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(name, body, original UNINDEXED, tokenize=\"porter unicode61\")")
         }
     }
@@ -43,37 +149,27 @@ class IndexStore(val dbPath: String) : AutoCloseable {
     private fun exec(sql: String) = db.createStatement().use { it.execute(sql) }
 
     @Synchronized
-    fun upsertFile(
-        path: String,
-        kind: String,
-        size: Long,
-        mtime: Long,
-        inode: Long,
-        device: Long,
-        state: String = "pending",
-        detail: String? = null,
-        info: String? = null,
-    ): Long {
+    fun upsertFile(row: FileRow): Long {
         db.prepareStatement(
             "INSERT INTO files(path,kind,size,mtime,inode,device,state,detail,info,indexed_at) VALUES (?,?,?,?,?,?,?,?,?,?) " +
                 "ON CONFLICT(path) DO UPDATE SET kind=excluded.kind,size=excluded.size,mtime=excluded.mtime,inode=excluded.inode," +
                 "device=excluded.device,state=CASE WHEN files.size=excluded.size AND files.mtime=excluded.mtime AND " +
                 "files.inode=excluded.inode THEN files.state ELSE excluded.state END,detail=excluded.detail,info=excluded.info",
         ).use {
-            it.setString(1, path)
-            it.setString(2, kind)
-            it.setLong(3, size)
-            it.setLong(4, mtime)
-            it.setLong(5, inode)
-            it.setLong(6, device)
-            it.setString(7, state)
-            it.setString(8, detail)
-            it.setString(9, info)
-            it.setLong(10, System.currentTimeMillis())
+            it.setString(BIND_PATH, row.path)
+            it.setString(BIND_KIND, row.kind)
+            it.setLong(BIND_SIZE, row.size)
+            it.setLong(BIND_MTIME, row.mtime)
+            it.setLong(BIND_INODE, row.inode)
+            it.setLong(BIND_DEVICE, row.device)
+            it.setString(BIND_STATE, row.state)
+            it.setString(BIND_DETAIL, row.detail)
+            it.setString(BIND_INFO, row.info)
+            it.setLong(BIND_INDEXED_AT, System.currentTimeMillis())
             it.executeUpdate()
         }
         db.prepareStatement("SELECT id FROM files WHERE path=?").use {
-            it.setString(1, path)
+            it.setString(1, row.path)
             it.executeQuery().use { rs ->
                 rs.next()
                 return rs.getLong(1)
@@ -83,18 +179,8 @@ class IndexStore(val dbPath: String) : AutoCloseable {
 
     /** Inserts the segment plus its FTS row (rowid = segment id) in one txn. */
     @Synchronized
-    fun addSegment(
-        fileId: Long,
-        kind: String,
-        modality: String,
-        loc: Double?,
-        locEnd: Double?,
-        excerpt: String?,
-        vec: ByteArray?,
-        name: String,
-        body: String,
-        original: String,
-    ): Long {
+    @Suppress("TooGenericExceptionCaught") // rollback safety net: any failure mid-txn must roll back, never half-write.
+    fun addSegment(row: SegmentRow): Long {
         db.autoCommit = false
         try {
             val segId =
@@ -102,13 +188,13 @@ class IndexStore(val dbPath: String) : AutoCloseable {
                     "INSERT INTO segments(file_id,kind,modality,loc,loc_end,excerpt,vec) VALUES (?,?,?,?,?,?,?)",
                     java.sql.Statement.RETURN_GENERATED_KEYS,
                 ).use {
-                    it.setLong(1, fileId)
-                    it.setString(2, kind)
-                    it.setString(3, modality)
-                    loc?.let { v -> it.setDouble(4, v) } ?: it.setNull(4, java.sql.Types.REAL)
-                    locEnd?.let { v -> it.setDouble(5, v) } ?: it.setNull(5, java.sql.Types.REAL)
-                    it.setString(6, excerpt)
-                    it.setBytes(7, vec)
+                    it.setLong(SEG_BIND_FILE, row.fileId)
+                    it.setString(SEG_BIND_KIND, row.kind)
+                    it.setString(SEG_BIND_MODALITY, row.modality)
+                    row.loc?.let { v -> it.setDouble(SEG_BIND_LOC, v) } ?: it.setNull(SEG_BIND_LOC, java.sql.Types.REAL)
+                    row.locEnd?.let { v -> it.setDouble(SEG_BIND_LOC_END, v) } ?: it.setNull(SEG_BIND_LOC_END, java.sql.Types.REAL)
+                    it.setString(SEG_BIND_EXCERPT, row.excerpt)
+                    it.setBytes(SEG_BIND_VEC, row.vec)
                     it.executeUpdate()
                     it.generatedKeys.use { keys ->
                         keys.next()
@@ -116,10 +202,10 @@ class IndexStore(val dbPath: String) : AutoCloseable {
                     }
                 }
             db.prepareStatement("INSERT INTO fts(rowid,name,body,original) VALUES (?,?,?,?)").use {
-                it.setLong(1, segId)
-                it.setString(2, name)
-                it.setString(3, body)
-                it.setString(4, original)
+                it.setLong(FTS_BIND_ROWID, segId)
+                it.setString(FTS_BIND_NAME, row.name)
+                it.setString(FTS_BIND_BODY, row.body)
+                it.setString(FTS_BIND_ORIGINAL, row.original)
                 it.executeUpdate()
             }
             db.commit()
@@ -150,11 +236,13 @@ class IndexStore(val dbPath: String) : AutoCloseable {
                 it.setString(2, oldPath)
                 it.executeUpdate() > 0
             }
-        } catch (e: SQLException) {
+        } catch (_: SQLException) {
+            // Move onto an existing path violates the UNIQUE constraint: report false, never throw.
             false
         }
 
     @Synchronized
+    @Suppress("TooGenericExceptionCaught") // rollback safety net: any failure mid-txn must roll back, never half-write.
     fun deleteFile(path: String): Boolean {
         val id =
             db.prepareStatement("SELECT id FROM files WHERE path=?").use {
@@ -183,6 +271,7 @@ class IndexStore(val dbPath: String) : AutoCloseable {
 
     /** Deletes files outside [knownPaths]. Caller passes this only when the root still exists. */
     @Synchronized
+    @Suppress("TooGenericExceptionCaught") // rollback safety net: any failure mid-txn must roll back, never half-write.
     fun pruneMissing(knownPaths: Set<String>): Int {
         val stale =
             db.createStatement().use { st ->
@@ -220,9 +309,19 @@ class IndexStore(val dbPath: String) : AutoCloseable {
                 "WHEN 'video' THEN 5 ELSE 6 END, id ASC LIMIT ?",
         ).use {
             it.setInt(1, limit)
-            it.executeQuery().use {
-                    rs ->
-                buildList { while (rs.next()) add(PendingFile(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4))) }
+            it.executeQuery().use { rs ->
+                buildList {
+                    while (rs.next()) {
+                        add(
+                            PendingFile(
+                                rs.getLong(PENDING_COL_ID),
+                                rs.getString(PENDING_COL_PATH),
+                                rs.getString(PENDING_COL_KIND),
+                                rs.getString(PENDING_COL_STATE),
+                            ),
+                        )
+                    }
+                }
             }
         }
 
@@ -237,11 +336,14 @@ class IndexStore(val dbPath: String) : AutoCloseable {
     /** True when stored fingerprint matches; first store skips the wipe (fresh index, nothing to mix).
      * A changed fingerprint wipes the index, stores [fp], returns false. */
     @Synchronized
-    fun checkFingerprint(fp: Fingerprint): Boolean {
+    fun checkFingerprint(fp: Fingerprint): Boolean = checkFingerprint(fp.toString())
+
+    @Synchronized
+    fun checkFingerprint(fpText: String): Boolean {
         val stored = getMeta("fingerprint")
-        if (stored == fp.text) return true
+        if (stored == fpText) return true
         if (stored != null) resetAll()
-        setMeta("fingerprint", fp.text)
+        setMeta("fingerprint", fpText)
         return false
     }
 
@@ -280,6 +382,7 @@ class IndexStore(val dbPath: String) : AutoCloseable {
         }
 
     @Synchronized
+    @Suppress("TooGenericExceptionCaught") // rollback safety net: any failure mid-txn must roll back, never half-write.
     fun resetAll() {
         db.autoCommit = false
         try {

@@ -14,6 +14,9 @@ data class ImagePlan(
 private val RAW_FORMATS = setOf("arw", "cr2", "cr3", "nef", "dng", "rw2", "orf", "raf", "pef", "srw")
 private val RAW_MIME_HINTS = listOf("adobe-dng", "/arw", "/x-sony-arw", "/x-olympus-orf", "/x-fuji-raf", "/x-panasonic-rw2")
 
+/** Smallest longest-side that still counts as content; below this in both dims the image is an icon. */
+private const val ICON_LONGEST_PX = 256
+
 /** Size + skip rules. HEIC is NOT skipped (decoded on-device via ImageDecoder). */
 fun plan(
     width: Int,
@@ -27,13 +30,17 @@ fun plan(
             ImageKind.PHOTO -> ImagePlan(longestSide = 1024, png = false, visionTokens = 140)
             ImageKind.SCREENSHOT -> ImagePlan(longestSide = 1536, png = true, visionTokens = 280)
         }
-    if (width <= 0 || height <= 0) return base.copy(skipReason = "skipped:invalid-dims")
-    // Icons are small in both dims; a wide banner (1920x100) is real content, not an icon.
-    if (maxOf(width, height) < 256) return base.copy(skipReason = "skipped:icon")
     val norm = format.lowercase(java.util.Locale.ROOT)
     val ext = norm.substringAfterLast(".")
-    if (ext in RAW_FORMATS || RAW_MIME_HINTS.any { it in norm }) return base.copy(skipReason = "skipped:raw-v1")
-    return base
+    val skipReason =
+        when {
+            width <= 0 || height <= 0 -> "skipped:invalid-dims"
+            // Icons are small in both dims; a wide banner (1920x100) is real content, not an icon.
+            maxOf(width, height) < ICON_LONGEST_PX -> "skipped:icon"
+            ext in RAW_FORMATS || RAW_MIME_HINTS.any { it in norm } -> "skipped:raw-v1"
+            else -> null
+        }
+    return if (skipReason == null) base else base.copy(skipReason = skipReason)
 }
 
 /** Screenshot iff path or MediaStore bucket mentions screenshots, or filename starts with "Screenshot". */
@@ -41,10 +48,10 @@ fun isScreenshot(
     path: String,
     bucket: String?,
 ): Boolean {
-    if (bucket != null && bucket.contains("screenshot", ignoreCase = true)) return true
-    if (path.contains("screenshot", ignoreCase = true)) return true
+    val bucketHit = bucket != null && bucket.contains("screenshot", ignoreCase = true)
+    val pathHit = path.contains("screenshot", ignoreCase = true)
     val name = path.substringAfterLast('/').substringAfterLast('\\')
-    return name.startsWith("screenshot", ignoreCase = true)
+    return bucketHit || pathHit || name.startsWith("screenshot", ignoreCase = true)
 }
 
 /** OCR backend seam — device wires ML Kit Text Recognition v2 here; Linux tests use a fake. */

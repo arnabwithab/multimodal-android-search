@@ -18,15 +18,18 @@ Mirrors DigUp's `Indexer / LlamaRuntime / IndexStore / Searcher` split, minus th
 
 ## 2. Model layer (the important choice)
 
-Do **not** use raw `.tflite` + `tflite_flutter`. EmbeddingGemma 2 ships as LiteRT-LM (`.litertlm`) with QAT quantisation and per-SoC NPU builds:
+Verified on the Hub (Oct 2026 CPU probe): `google/embeddinggemma-300m` text
+model exists (768d). No `embeddinggemma-2` id exists on the Hub — the
+`litert-community/embeddinggemma-2-*-litert-lm` ids previously listed here
+were unverified and are removed.
 
 | HF repo | Params | Download | Use for |
 |---|---|---|---|
-| `litert-community/embeddinggemma-2-text-270m-litert-lm` | 270M, int4 | ~165MB | queries + doc/code text. Ship first, keep resident while typing |
-| `...-text-vision-440m-litert-lm` | +170M vision int8 | ~388MB total | images, PDF renders, video frames. Lazy-load |
-| `...-740m-litert-lm` | +300M audio mixed int2/4/8 | ~485MB total | audio windows, video soundtracks. Behind "enable audio search" |
+| `google/embeddinggemma-300m` | 300M | size unverified (prior ~165MB was an estimate) | queries + doc/code text. Ship first, keep resident while typing |
+| vision `.litertlm` variant | UNVERIFIED — verify against the Hub before shipping; F012 picker assumptions unconfirmed | estimate (prior ~388MB total was an estimate) | images, PDF renders, video frames. Lazy-load |
+| audio `.litertlm` variant | UNVERIFIED — verify against the Hub before shipping; F012 picker assumptions unconfirmed | estimate (prior ~485MB total was an estimate) | audio windows, video soundtracks. Behind "enable audio search" |
 
-Each repo has a generic CPU/GPU file + AOT files per SoC (`Qualcomm_SM8xxx`, `Tensor_G5/G6`, `MT699x`…). Picker at first run: exact SoC match → generic NPU → GPU → XNNPACK CPU. Backends: Pixel TPU/NPU → Qualcomm NPU → GPU → CPU, with auto-fallback when a delegate rejects ops (split execution hurts more than it helps — same lesson as NNAPI/GPU delegate docs).
+Each repo has a generic CPU/GPU file + AOT files per SoC (UNVERIFIED filenames such as `Qualcomm_SM8xxx`, `Tensor_G5/G6`, `MT699x` — verify against the Hub before shipping; F012 picker assumptions unconfirmed). Picker at first run: exact SoC match → generic NPU → GPU → XNNPACK CPU. Backends: Pixel TPU/NPU → Qualcomm NPU → GPU → CPU, with auto-fallback when a delegate rejects ops (split execution hurts more than it helps — same lesson as NNAPI/GPU delegate docs).
 
 Input contracts (from model cards + DigUp):
 

@@ -140,6 +140,13 @@ class EmbedderTest {
     }
 
     @Test
+    fun `fingerprintObj carries structured fields`() {
+        val fp = Embedder(FakeBackend(), dim = 256).fingerprintObj("m", "rev", "gpu", "fp16", "b")
+        assertEquals(Fingerprint("m", "rev", "gpu", "fp16", 256, "b"), fp)
+        assertEquals("m@rev gpu fp16 256 b", fp.toString())
+    }
+
+    @Test
     fun `backend returning wrong dim throws before truncate`() {
         val embedder = Embedder(FakeBackend(vecDim = 4), dim = 256)
         assertFailsWith<IllegalArgumentException> { embedder.embedQuery("too short") }

@@ -10,6 +10,8 @@ object AudioWindows {
     const val HOP_SEC = 25
     const val SILENCE_GATE_DB = -50.0
     const val TAIL_MIN_SEC = 2
+    private const val S16_FULL_SCALE = 32768.0
+    private const val DB_GAIN = 20
 
     data class AudioWindow(val index: Int, val startSec: Double, val endSec: Double) {
         val loc: Double get() = startSec
@@ -41,9 +43,8 @@ object AudioWindows {
     fun rmsDb(samples: ShortArray): Double {
         if (samples.isEmpty()) return Double.NEGATIVE_INFINITY
         var sum = 0.0
-        for (s in samples) sum += (s / 32768.0) * (s / 32768.0)
+        for (s in samples) sum += (s / S16_FULL_SCALE) * (s / S16_FULL_SCALE)
         val rms = sqrt(sum / samples.size)
-        if (rms <= 0.0) return Double.NEGATIVE_INFINITY
-        return 20 * log10(rms)
+        return if (rms <= 0.0) Double.NEGATIVE_INFINITY else DB_GAIN * log10(rms)
     }
 }

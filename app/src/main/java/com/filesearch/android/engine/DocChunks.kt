@@ -1,6 +1,17 @@
 package com.filesearch.android.engine
 
+import java.io.IOException
+import java.io.InputStream
 import java.util.zip.ZipInputStream
+
+/** Zip entry bytes are truncated here; untrusted input must never hold RAM hostage. */
+const val ZIP_ENTRY_CAP_BYTES = 32 * 1024 * 1024
+
+private const val IO_BUFFER_SIZE = 8192
+private const val HEX_RADIX = 16
+private const val RTF_UNICODE_MODULO = 65536
+private const val DIGIT_DUMP_NON_LETTER_FRACTION = 0.7
+private const val DIGIT_DUMP_LETTER_CEILING = 0.1
 
 enum class DocFormat { TXT, MD, HTML, DOCX, ODT, RTF }
 
@@ -17,41 +28,58 @@ fun formatFor(fileName: String): DocFormat? {
     }
 }
 
-// shortcut: corrupt input returns empty, switch to nullable so Indexer can mark failed per design.md §11
+/** Null means unreadable (missing entry / corrupt zip) so Indexer can mark failed per design §11. */
 fun extractText(
     format: DocFormat,
     bytes: ByteArray,
-): String =
+): String? =
     when (format) {
         DocFormat.TXT, DocFormat.MD -> bytes.toString(Charsets.UTF_8)
         DocFormat.HTML -> stripHtml(bytes.toString(Charsets.UTF_8))
-        DocFormat.DOCX -> stripTags(zipEntry(bytes, "word/document.xml"))
-        DocFormat.ODT -> stripTags(zipEntry(bytes, "content.xml"))
+        DocFormat.DOCX -> zipEntry(bytes, "word/document.xml")?.let { stripTags(it) }
+        DocFormat.ODT -> zipEntry(bytes, "content.xml")?.let { stripTags(it) }
         DocFormat.RTF -> stripRtf(bytes.toString(Charsets.UTF_8))
     }
 
-/** Zip entry text or "" when missing/corrupt — never throws. */
+/** Zip entry text truncated at [ZIP_ENTRY_CAP_BYTES], or null when missing/corrupt — never throws. */
 private fun zipEntry(
     bytes: ByteArray,
     name: String,
-): String {
+): String? =
     try {
-        ZipInputStream(bytes.inputStream()).use { zip ->
-            var entry = zip.nextEntry
-            while (entry != null) {
-                if (entry.name == name) {
-                    return zip.readBytes().toString(
-                        Charsets.UTF_8,
-                    ) // shortcut: zip entry read uncapped, cap at ~32MB when Indexer wires untrusted input
-                }
-                zip.closeEntry()
-                entry = zip.nextEntry
-            }
-        }
-    } catch (_: Exception) {
-        // corrupt zip -> ""
+        ZipInputStream(bytes.inputStream()).use { zip -> readNamedEntry(zip, name) }
+    } catch (_: IOException) {
+        // Corrupt/truncated zip: the file is marked failed upstream, never crashes the queue.
+        null
     }
-    return ""
+
+private fun readNamedEntry(
+    zip: ZipInputStream,
+    name: String,
+): String? {
+    var entry = zip.nextEntry
+    while (entry != null) {
+        if (entry.name == name) return readCapped(zip, ZIP_ENTRY_CAP_BYTES).toString(Charsets.UTF_8)
+        zip.closeEntry()
+        entry = zip.nextEntry
+    }
+    return null
+}
+
+internal fun readCapped(
+    stream: InputStream,
+    cap: Int,
+): ByteArray {
+    val out = java.io.ByteArrayOutputStream()
+    val buf = ByteArray(IO_BUFFER_SIZE)
+    var total = 0
+    while (total < cap) {
+        val n = stream.read(buf, 0, minOf(buf.size, cap - total))
+        if (n <= 0) break
+        out.write(buf, 0, n)
+        total += n
+    }
+    return out.toByteArray()
 }
 
 private fun stripHtml(html: String): String {
@@ -67,12 +95,29 @@ private fun unescape(s: String): String =
         .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'")
         .replace("&amp;", "&")
 
-// Best-effort one pass: control words go, braces go, text stays.
-// shortcut: RTF \uN and hex escapes pass through as noise
-private fun stripRtf(rtf: String): String =
-    rtf.replace(Regex("\\\\[a-zA-Z]+-?\\d*[ ]?"), " ")
-        .replace(Regex("[{}\\\\]"), "")
+// Best-effort one pass: \uN + \'hh decoded first, then control words go, braces go, text stays.
+private fun stripRtf(rtf: String): String {
+    var s = decodeRtfEscapes(rtf)
+    s = s.replace(Regex("\\\\[a-zA-Z]+-?\\d*[ ]?"), " ")
+    return s.replace(Regex("[{}\\\\]"), "")
         .replace(Regex("\\s+"), " ").trim()
+}
+
+private fun decodeRtfEscapes(s: String): String {
+    var out = Regex("""\\'([0-9a-fA-F]{2})""").replace(s) { m -> m.groupValues[1].toInt(HEX_RADIX).toChar().toString() }
+    out =
+        Regex("""\\u(-?\d+)(.)?""").replace(out) { m ->
+            var code = m.groupValues[1].toIntOrNull() ?: return@replace m.value
+            if (code < 0) code += RTF_UNICODE_MODULO
+            val fallback = m.groupValues[2]
+            val ch = code.toChar().toString()
+            if (fallback.isEmpty() || isRtfGroupDelimiter(fallback)) ch + fallback else ch
+        }
+    return out
+}
+
+/** Group delimiters stay after a \uN escape; any other char is the RTF fallback and is dropped. */
+private fun isRtfGroupDelimiter(s: String): Boolean = s == "\\" || s == "{" || s == "}"
 
 data class Chunk(
     val index: Int,
@@ -95,7 +140,6 @@ fun chunk(
     if (text.isBlank()) return emptyList()
     val size = chunkSize.coerceAtLeast(1)
     val hop = overlap.coerceIn(0, size - 1).let { size - it }
-    val wantVector = vectorWanted(text)
     val out = ArrayList<Chunk>()
     var start = 0
     while (start < text.length && out.size < maxChunks.coerceAtLeast(1)) {
@@ -105,7 +149,8 @@ fun chunk(
             if (ws > start) end = ws
         }
         if (end <= start) end = minOf(start + 1, text.length)
-        out.add(Chunk(out.size, start, end, text.substring(start, end), wantVector))
+        val slice = text.substring(start, end)
+        out.add(Chunk(out.size, start, end, slice, vectorWanted(slice)))
         if (end >= text.length) break
         val next = end - (size - hop)
         start = if (next <= start) start + 1 else next
@@ -118,8 +163,8 @@ fun isDigitDump(text: String): Boolean {
     val chars = text.filterNot { it.isWhitespace() }
     if (chars.isEmpty()) return false
     val letters = chars.count { it.isLetter() }
-    return (chars.length - letters).toDouble() / chars.length >= 0.7 && letters.toDouble() / chars.length < 0.1
+    return (chars.length - letters).toDouble() / chars.length >= DIGIT_DUMP_NON_LETTER_FRACTION &&
+        letters.toDouble() / chars.length < DIGIT_DUMP_LETTER_CEILING
 }
 
-// shortcut: vector flag is per-file, evaluate per-chunk if evals show buried prose
 fun vectorWanted(text: String): Boolean = !isDigitDump(text)

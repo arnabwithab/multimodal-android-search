@@ -9,6 +9,12 @@ package com.filesearch.android.app
 private val pageKinds = setOf("page", "page_image")
 private val timeKinds = setOf("audio", "frame")
 
+private const val SECONDS_PER_MINUTE = 60
+private const val SECONDS_PER_HOUR = 3600
+private const val MS_PER_SECOND = 1000
+private const val MS_PER_MINUTE = 60_000
+private const val MS_PER_HOUR = 3_600_000
+
 /** One search result row: thumbnail lookup key, file/kind badge, marked excerpt, location label. */
 data class ResultRow(
     val fileName: String,
@@ -31,10 +37,15 @@ fun formatLoc(
         in pageKinds -> "p.${(loc.toInt() + 1).coerceAtLeast(1)}"
         in timeKinds -> {
             val s = loc.toLong().coerceAtLeast(0)
-            if (s >= 3600) {
-                "%d:%02d:%02d".format(java.util.Locale.US, s / 3600, (s % 3600) / 60, s % 60)
+            if (s >= SECONDS_PER_HOUR) {
+                "%d:%02d:%02d".format(
+                    java.util.Locale.US,
+                    s / SECONDS_PER_HOUR,
+                    (s % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE,
+                    s % SECONDS_PER_MINUTE,
+                )
             } else {
-                "%02d:%02d".format(java.util.Locale.US, s / 60, s % 60)
+                "%02d:%02d".format(java.util.Locale.US, s / SECONDS_PER_MINUTE, s % SECONDS_PER_MINUTE)
             }
         }
         else -> ""
@@ -49,13 +60,21 @@ fun markExcerpt(
     ranges: List<IntRange>,
 ): String {
     if (text.isEmpty() || ranges.isEmpty()) return text
+    return mergedRanges(text, ranges)?.let { renderMarked(text, it) } ?: text
+}
+
+/** Normalized, sorted, overlap-merged ranges — or null when nothing survives clamping. */
+private fun mergedRanges(
+    text: String,
+    ranges: List<IntRange>,
+): List<IntRange>? {
     val sorted =
         ranges.mapNotNull { r ->
             val s = r.first.coerceIn(0, text.length)
             val e = r.last.coerceIn(-1, text.length - 1)
             if (s > e) null else s..e
         }.sortedBy { it.first }
-    if (sorted.isEmpty()) return text
+    if (sorted.isEmpty()) return null
     val merged = mutableListOf(sorted[0])
     for (r in sorted.drop(1)) {
         val last = merged.last()
@@ -65,6 +84,13 @@ fun markExcerpt(
             merged += r
         }
     }
+    return merged
+}
+
+private fun renderMarked(
+    text: String,
+    merged: List<IntRange>,
+): String {
     val out = StringBuilder()
     var i = 0
     for (r in merged) {
@@ -88,9 +114,9 @@ data class SearchUiState(val query: String, val rows: List<ResultRow>, val expan
 fun formatRemaining(ms: Long): String =
     when {
         ms <= 0 -> "finishing…"
-        ms < 60_000 -> "≈${ms / 1000} sec left"
-        ms < 3_600_000 -> "≈${ms / 60_000} min left"
-        else -> "≈${ms / 3_600_000} h ${(ms % 3_600_000) / 60_000} min left"
+        ms < MS_PER_MINUTE -> "≈${ms / MS_PER_SECOND} sec left"
+        ms < MS_PER_HOUR -> "≈${ms / MS_PER_MINUTE} min left"
+        else -> "≈${ms / MS_PER_HOUR} h ${(ms % MS_PER_HOUR) / MS_PER_MINUTE} min left"
     }
 
 private val allowedExcluded = setOf("image", "pdf", "doc", "audio", "video")

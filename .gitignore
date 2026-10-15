@@ -1,3 +1,4 @@
 build/
 app/build/
 .gradle/
+__pycache__/

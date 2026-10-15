@@ -14,6 +14,8 @@ enum class FileDecision {
 object Rules {
     const val DATASET_MIN_COUNT = 300
     private const val SMALL_ICON_MAX_BYTES = 1024L
+    private const val MIN_DIGIT_STEM_LENGTH = 4
+    private const val MIN_HEX_STEM_LENGTH = 8
 
     private val secretExts = setOf("pem", "key", "p12", "pfx", "jks", "keystore", "asc")
     private val imageExts = setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "heif", "avif")
@@ -35,26 +37,24 @@ object Rules {
         val segs = norm.split('/').map { it.lowercase() }
         val name = segs.lastOrNull().orEmpty()
         val ext = name.substringAfterLast('.', "")
-        if (ext in secretExts || name == ".env" || name.startsWith(".env.") ||
-            name.endsWith(".env") || "password" in name
-        ) {
-            return FileDecision.SKIP_SECRET
+        return when {
+            ext in secretExts || isEnvFile(name) || "password" in name -> FileDecision.SKIP_SECRET
+            segs.any { it in vendoredDirs } -> FileDecision.SKIP_VENDORED
+            // dot segments cover .cache and hidden files; Android/data is the app-private dir.
+            isHidden || segs.any { it.startsWith(".") } || "android/data" in norm.lowercase() -> FileDecision.SKIP_HIDDEN
+            isCloudPlaceholder -> FileDecision.SKIP_CLOUD_PLACEHOLDER
+            ext in imageExts && size < SMALL_ICON_MAX_BYTES -> FileDecision.SKIP_SMALL_ICON
+            else -> FileDecision.INDEX
         }
-        if (segs.any { it in vendoredDirs }) return FileDecision.SKIP_VENDORED
-        // dot segments cover .cache and hidden files; Android/data is the app-private dir.
-        if (isHidden || segs.any { it.startsWith(".") } || "android/data" in norm.lowercase()) {
-            return FileDecision.SKIP_HIDDEN
-        }
-        if (isCloudPlaceholder) return FileDecision.SKIP_CLOUD_PLACEHOLDER
-        if (ext in imageExts && size < SMALL_ICON_MAX_BYTES) return FileDecision.SKIP_SMALL_ICON
-        return FileDecision.INDEX
     }
+
+    private fun isEnvFile(name: String): Boolean = name == ".env" || name.startsWith(".env.") || name.endsWith(".env")
 
     /** Hex/digit stems (000001.jpg, abc123def456.png) count; IMG_/PXL_/Screenshot_ names do not. */
     fun isMachineNamed(name: String): Boolean {
         val stem = name.substringBeforeLast('.')
-        if (stem.length >= 4 && stem.all { it.isDigit() }) return true
-        return stem.length >= 8 &&
+        if (stem.length >= MIN_DIGIT_STEM_LENGTH && stem.all { it.isDigit() }) return true
+        return stem.length >= MIN_HEX_STEM_LENGTH &&
             stem.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' || it == '_' || it == '-' }
     }
 

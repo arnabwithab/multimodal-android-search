@@ -1,44 +1,17 @@
 # detekt overrides for multimodal-search-for-android (applied on top of the
 # default ruleset via buildUponDefaultConfig in app/build.gradle.kts).
-# Rule of thumb: a detekt finding that needs a logic rewrite is recorded here
-# as a shortcut instead of restructured — engine semantics are frozen.
 
 style:
   MaxLineLength:
     active: true
     maxLineLength: 140 # single source of truth: matches ktlint's 140 so both linters agree.
-  MagicNumber:
-    # shortcut: engine math/SQL/thresholds use inline numbers; extracting ~140
-    # named constants is churn with no behavior value. Revisit if one causes a bug.
-    active: false
-  ReturnCount:
-    # shortcut: early-return guards keep engine parsers readable;
-    # restructuring risks logic changes. Revisit with a per-function budget.
-    active: false
 
 complexity:
-  # shortcut (whole section): complexity findings below each demand restructuring
-  # an engine function — forbidden while engine semantics are frozen.
-  CyclomaticComplexMethod:
-    active: false
-  ComplexCondition:
-    active: false
-  NestedBlockDepth:
-    active: false
-  LongParameterList:
-    # engine functions take explicit params over param objects (explicit-over-clever).
-    active: false
   TooManyFunctions:
-    # IndexStore is a thin DAO; splitting it is a refactor, not a fix.
-    active: false
-
-exceptions:
-  TooGenericExceptionCaught:
-    # shortcut: SQLite/IO fallbacks intentionally catch broad Exception
-    # (old-SQLite FTS5 fallback, unreadable files); narrowing changes
-    # error-handling semantics.
-    active: false
-  SwallowedException:
-    # shortcut: fallback paths continue-by-design (errors are values at trust
-    # boundaries); flagging each is noise.
+    # LEFT OPEN (only carve-out): IndexStore is a 17-function thin DAO (threshold 11) and
+    # DocChunks.kt holds 14 top-level chunking helpers (threshold 11). Fixing either means
+    # splitting a public DAO/file surface — a structural refactor, not a local fix — so the
+    # rule stays off until a feature genuinely reshapes those units. All other complexity
+    # rules (ReturnCount, CyclomaticComplexMethod, ComplexCondition, NestedBlockDepth,
+    # LongParameterList) are at defaults and green.
     active: false

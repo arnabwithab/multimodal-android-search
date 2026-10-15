@@ -10,18 +10,21 @@ package com.filesearch.android.engine
 object VideoKeyframes {
     const val SAME_SHOT_BITS = 4
     const val MAX_FRAMES = 1200
+    private const val AHASH_BYTES = 64
+    private const val BYTE_MASK = 0xFF
+    private const val THINNING_SECONDS = 3
 
     data class VideoFrame(val index: Int, val startSec: Double, val endSec: Double)
 
     /** 8x8 mean-threshold hash over 64 gray bytes (unsigned). */
     fun ahash(gray64: ByteArray): Long {
-        require(gray64.size == 64) { "ahash needs exactly 64 gray bytes, got ${gray64.size}" }
+        require(gray64.size == AHASH_BYTES) { "ahash needs exactly $AHASH_BYTES gray bytes, got ${gray64.size}" }
         var sum = 0L
-        for (b in gray64) sum += (b.toInt() and 0xFF)
-        val mean = sum / 64.0
+        for (b in gray64) sum += (b.toInt() and BYTE_MASK)
+        val mean = sum.toDouble() / AHASH_BYTES
         var hash = 0L
         for (i in gray64.indices) {
-            if ((gray64[i].toInt() and 0xFF) > mean) hash = hash or (1L shl i)
+            if ((gray64[i].toInt() and BYTE_MASK) > mean) hash = hash or (1L shl i)
         }
         return hash
     }
@@ -51,9 +54,8 @@ object VideoKeyframes {
                 last = hashes[i]
             }
         }
-        val budget = minOf(MAX_FRAMES, maxOf(1, (durationSec / 3).toInt()))
-        if (kept.size <= budget) return kept
-        return List(budget) { kept[(it * kept.size.toDouble() / budget).toInt()] }
+        val budget = minOf(MAX_FRAMES, maxOf(1, (durationSec / THINNING_SECONDS).toInt()))
+        return if (kept.size <= budget) kept else List(budget) { kept[(it * kept.size.toDouble() / budget).toInt()] }
     }
 
     /**

@@ -66,11 +66,20 @@ class Embedder(private val backend: EmbedBackend, val dim: Int = 256) {
         }
 
     /** `model@rev runtime dtype dim budgets`; any change forces full re-embed. */
+    fun fingerprintObj(
+        model: String,
+        rev: String,
+        runtime: String,
+        dtype: String,
+        budgets: String,
+    ): Fingerprint = Fingerprint(model, rev, runtime, dtype, dim, budgets)
+
+    /** `model@rev runtime dtype dim budgets`; any change forces full re-embed. */
     fun fingerprint(
         model: String,
         rev: String,
         runtime: String,
         dtype: String,
         budgets: String,
-    ): String = "$model@$rev $runtime $dtype $dim $budgets"
+    ): String = fingerprintObj(model, rev, runtime, dtype, budgets).toString()
 }

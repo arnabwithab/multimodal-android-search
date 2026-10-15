@@ -54,8 +54,10 @@ class CostMeter(var millisUsed: Long = 0) {
         millisUsed += millis
     }
 
-    fun minuteBucket(): Long = millisUsed / 60_000L
+    fun minuteBucket(): Long = millisUsed / MS_PER_MINUTE
 }
+
+private const val MS_PER_MINUTE = 60_000L
 
 /**
  * Offline fallback (design §7 / arch §7): the typed query always works.

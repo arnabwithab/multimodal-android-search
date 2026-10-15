@@ -7,11 +7,14 @@ data class ModelPack(val id: String, val bytes: Long)
 
 object ModelPacks {
     private const val MB = 1024L * 1024L
+    private const val TEXT_PACK_MB = 165L
+    private const val VISION_DELTA_MB = 223L
+    private const val AUDIO_DELTA_MB = 97L
 
     // Sizes are incremental deltas: 165MB base, +223MB vision, +97MB audio (totals 388/485).
-    val TEXT_270M = ModelPack("text-270m", 165L * MB)
-    val TEXT_VISION_440M = ModelPack("text-vision-440m", 223L * MB)
-    val FULL_740M = ModelPack("full-740m", 97L * MB)
+    val TEXT_270M = ModelPack("text-270m", TEXT_PACK_MB * MB)
+    val TEXT_VISION_440M = ModelPack("text-vision-440m", VISION_DELTA_MB * MB)
+    val FULL_740M = ModelPack("full-740m", AUDIO_DELTA_MB * MB)
 }
 
 /**
@@ -22,6 +25,9 @@ object ModelPacks {
  * user-deletable policy live in Settings (F011).
  */
 object ModelManager {
+    private const val IO_BUFFER_SIZE = 8192
+    private const val HEX_RADIX = 16
+
     private val staged = listOf(ModelPacks.TEXT_270M, ModelPacks.TEXT_VISION_440M, ModelPacks.FULL_740M)
 
     /** Next staged pack to fetch, or null when satisfied (740M only when [wantAudio]). */
@@ -39,17 +45,11 @@ object ModelManager {
         artifacts: List<String>,
     ): String {
         if (artifacts.isEmpty()) return "cpu"
-        if (soc.isNotBlank()) artifacts.firstOrNull { it.contains(soc, ignoreCase = true) }?.let { return it }
-        artifacts.firstOrNull {
-            it.contains("npu", ignoreCase = true) || it.contains("tpu", ignoreCase = true)
-        }?.let { return it }
-        artifacts.firstOrNull {
-            it.contains("gpu", ignoreCase = true)
-        }?.let { return it }
-        artifacts.firstOrNull {
-            it.contains("cpu", ignoreCase = true) || it.contains("xnnpack", ignoreCase = true)
-        }?.let { return it }
-        return artifacts.first()
+        val socHit = soc.takeIf { it.isNotBlank() }?.let { s -> artifacts.firstOrNull { it.contains(s, ignoreCase = true) } }
+        val npuHit = artifacts.firstOrNull { it.contains("npu", ignoreCase = true) || it.contains("tpu", ignoreCase = true) }
+        val gpuHit = artifacts.firstOrNull { it.contains("gpu", ignoreCase = true) }
+        val cpuHit = artifacts.firstOrNull { it.contains("cpu", ignoreCase = true) || it.contains("xnnpack", ignoreCase = true) }
+        return socHit ?: npuHit ?: gpuHit ?: cpuHit ?: artifacts.first()
     }
 
     /** SHA-256 of [bytes] equals [expectedHex] (constant-time compare). */
@@ -66,11 +66,13 @@ object ModelManager {
         val expected =
             try {
                 hexToBytes(expectedHex.trim().lowercase())
-            } catch (_: Exception) {
+            } catch (_: IllegalArgumentException) {
+                // Malformed expected hex (odd length, empty, or non-hex digits) can never match: fail closed.
+                // NumberFormatException needs no separate catch: it already extends IllegalArgumentException.
                 return false
             }
         val md = MessageDigest.getInstance("SHA-256")
-        val buf = ByteArray(8192)
+        val buf = ByteArray(IO_BUFFER_SIZE)
         var n: Int
         while (stream.read(buf).also { n = it } != -1) md.update(buf, 0, n)
         return MessageDigest.isEqual(md.digest(), expected)
@@ -78,7 +80,7 @@ object ModelManager {
 
     private fun hexToBytes(hex: String): ByteArray {
         require(hex.length % 2 == 0 && hex.isNotEmpty())
-        return ByteArray(hex.length / 2) { i -> hex.substring(i * 2, i * 2 + 2).toInt(16).toByte() }
+        return ByteArray(hex.length / 2) { i -> hex.substring(i * 2, i * 2 + 2).toInt(HEX_RADIX).toByte() }
     }
 
     /** IndexStore fingerprint `model@rev runtime dtype dim budgets`; null stored -> false. */

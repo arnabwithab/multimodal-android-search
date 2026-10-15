@@ -67,7 +67,7 @@ class ChunkTest {
     @Test
     fun `html keeps space across block boundaries`() {
         val text = extractText(DocFormat.HTML, "<p>Fish</p><p>chips</p>".toByteArray(Charsets.UTF_8))
-        assertTrue(text.contains("Fish chips"), "merged blocks: '$text'")
+        assertTrue((text ?: "").contains("Fish chips"), "merged blocks: '$text'")
     }
 
     @Test
@@ -76,7 +76,7 @@ class ChunkTest {
             "<?xml version=\"1.0\"?><w:document><w:body>" +
                 "<w:p><w:t>Fish</w:t></w:p><w:p><w:t>chips</w:t></w:p></w:body></w:document>"
         val text = extractText(DocFormat.DOCX, zipBytes("word/document.xml", xml))
-        assertTrue(text.contains("Fish chips"), "merged paragraphs: '$text'")
+        assertTrue((text ?: "").contains("Fish chips"), "merged paragraphs: '$text'")
     }
 
     @Test
@@ -92,17 +92,60 @@ class ChunkTest {
     }
 
     @Test
-    fun `docx and odt with missing entry return empty without throwing`() {
-        assertEquals("", extractText(DocFormat.DOCX, zipBytes("other.xml", "<a/>")))
-        assertEquals("", extractText(DocFormat.ODT, "not a zip at all".toByteArray(Charsets.UTF_8)))
+    fun `docx and odt with missing entry return null without throwing`() {
+        assertNull(extractText(DocFormat.DOCX, zipBytes("other.xml", "<a/>")))
+        assertNull(extractText(DocFormat.ODT, "not a zip at all".toByteArray(Charsets.UTF_8)))
+    }
+
+    @Test
+    fun `docx empty entry is empty doc not failure`() {
+        assertEquals("", extractText(DocFormat.DOCX, zipBytes("word/document.xml", "")))
+        assertEquals("", extractText(DocFormat.ODT, zipBytes("content.xml", "")))
+    }
+
+    @Test
+    fun `zip entry cap is 32MB`() {
+        assertEquals(32 * 1024 * 1024, ZIP_ENTRY_CAP_BYTES)
+    }
+
+    @Test
+    fun `readCapped truncates at cap`() {
+        val data = "abcdef".toByteArray(Charsets.UTF_8)
+        assertEquals("abc", readCapped(data.inputStream(), 3).toString(Charsets.UTF_8))
+        assertEquals("abcdef", readCapped(data.inputStream(), 100).toString(Charsets.UTF_8))
     }
 
     @Test
     fun `rtf strips control words and braces`() {
         val rtf = "{\\rtf1\\ansi\\deff0 Hello \\b bold\\b0 and \\i italic\\i0.}"
-        val text = extractText(DocFormat.RTF, rtf.toByteArray(Charsets.UTF_8))
+        val text = extractText(DocFormat.RTF, rtf.toByteArray(Charsets.UTF_8)) ?: ""
         assertTrue(text.contains("Hello") && text.contains("bold") && text.contains("italic"))
         assertFalse(text.contains("{") || text.contains("\\"))
+    }
+
+    @Test
+    fun `rtf hex escape decodes accented text`() {
+        val rtf = "{\\rtf1\\ansi caf\\'e9 cr\\'e8me}"
+        val text = extractText(DocFormat.RTF, rtf.toByteArray(Charsets.UTF_8)) ?: ""
+        assertTrue(text.contains("café"), "hex e9: '$text'")
+        assertTrue(text.contains("crème"), "hex e8: '$text'")
+        assertFalse(text.contains("'e9"))
+    }
+
+    @Test
+    fun `rtf unicode escape decodes accented text`() {
+        val rtf = "{\\rtf1\\ansi caf\\u233? cr\\u232?me}"
+        val text = extractText(DocFormat.RTF, rtf.toByteArray(Charsets.UTF_8)) ?: ""
+        assertTrue(text.contains("café"), "u233: '$text'")
+        assertTrue(text.contains("crème"), "u232: '$text'")
+        assertFalse(text.contains("\\u"))
+    }
+
+    @Test
+    fun `rtf huge unicode escape does not throw`() {
+        val rtf = "{\\rtf1\\ansi hi\\u9999999999 there}"
+        val text = extractText(DocFormat.RTF, rtf.toByteArray(Charsets.UTF_8)) ?: ""
+        assertTrue(text.contains("hi") && text.contains("there"))
     }
 
     // chunk
@@ -173,6 +216,18 @@ class ChunkTest {
         assertTrue(chunks.isNotEmpty())
         assertFalse(vectorWanted(text))
         assertTrue(chunks.all { !it.vectorWanted })
+    }
+
+    @Test
+    fun `vector flag is per-chunk so buried prose still embeds`() {
+        val digits = "48291 773 007 42-17 99.5 ".repeat(20)
+        val prose = "The quick brown fox jumps over the lazy dog near the riverbank. ".repeat(20)
+        val text = digits + prose
+        val chunks = chunk(text, chunkSize = 100, overlap = 0)
+        assertTrue(chunks.size > 1)
+        for (c in chunks) assertEquals(vectorWanted(c.text), c.vectorWanted, "chunk ${c.index} flag must match its own text")
+        assertTrue(chunks.any { !it.vectorWanted }, "digit chunks stay keyword-only")
+        assertTrue(chunks.any { it.vectorWanted }, "buried prose chunks still embed")
     }
 
     // multilingual (no script branching: one path for every script)

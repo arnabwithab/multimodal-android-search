@@ -32,7 +32,11 @@ fun shouldPause(
  * Retry backoff: 30s base, doubling, capped at 30min (arch §6 retry with backoff).
  * [attempt] is 0-indexed (0 = first retry).
  */
-fun backoffMs(attempt: Int): Long = minOf(30_000L shl attempt.coerceIn(0, 6), 1_800_000L)
+private const val BACKOFF_BASE_MS = 30_000L
+private const val BACKOFF_MAX_SHIFT = 6
+private const val BACKOFF_CAP_MS = 1_800_000L
+
+fun backoffMs(attempt: Int): Long = minOf(BACKOFF_BASE_MS shl attempt.coerceIn(0, BACKOFF_MAX_SHIFT), BACKOFF_CAP_MS)
 
 /** Decoder stuck past this with no progress: kill job, mark stopped, keep partial (arch §6). */
 const val WATCHDOG_STUCK_MS = 5 * 60 * 1000L
@@ -54,6 +58,7 @@ class MeasuredCosts(perKindMsPerFile: Map<String, Double>) {
     private val sums = perKindMsPerFile.toMutableMap()
     private val counts = perKindMsPerFile.mapValues { 1L }.toMutableMap()
 
+    @Synchronized
     fun estimateRemainingMs(pendingCounts: Map<String, Long>): Long {
         if (pendingCounts.isEmpty() || sums.isEmpty()) return 0L
         val fallback = sums.map { (k, s) -> s / counts.getValue(k) }.average()
@@ -66,6 +71,7 @@ class MeasuredCosts(perKindMsPerFile: Map<String, Double>) {
     }
 
     /** Fold one finished file into the running average for [kind]. */
+    @Synchronized
     fun record(
         kind: String,
         elapsedMs: Long,

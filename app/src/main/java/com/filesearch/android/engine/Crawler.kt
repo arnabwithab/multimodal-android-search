@@ -1,6 +1,7 @@
 package com.filesearch.android.engine
 
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 
 data class CrawlEntry(val path: String, val size: Long, val mtime: Long, val inode: Long)
@@ -22,48 +23,83 @@ class Crawler(
         _skipped.clear()
         _errors.clear()
         val found = mutableListOf<CrawlEntry>()
+        collectInto(root, found)
+        return found
+    }
+
+    private fun collectInto(
+        root: File,
+        found: MutableList<CrawlEntry>,
+    ) {
         if (!root.exists()) {
             _errors.add("missing root: ${root.path}")
-            return found
+            return
         }
         if (root.isFile) {
             addFile(root, found)
-            return found
+            return
         }
+        drain(root, found)
+    }
+
+    private fun drain(
+        root: File,
+        found: MutableList<CrawlEntry>,
+    ) {
         val stack = ArrayDeque<File>()
         stack.add(root)
         while (stack.isNotEmpty()) {
             val dir = stack.removeLast()
-            val kids: Array<File> =
-                try {
-                    dir.listFiles()
-                } catch (_: SecurityException) {
-                    null
-                } ?: emptyArray()
-            if (kids.isEmpty() && !dir.canRead()) {
-                _errors.add("unreadable dir: ${dir.path}")
-                continue
-            }
+            val kids = listKids(dir) ?: continue
             val dataset =
                 Rules.isDatasetDir(
                     kids.count { it.isFile && Rules.isMediaName(it.name) && Rules.isMachineNamed(it.name) },
                 )
-            for (kid in kids) {
-                if (Files.isSymbolicLink(kid.toPath())) continue
-                if (kid.isDirectory) {
-                    if (kid.isHidden || kid.name.startsWith(".")) {
-                        _skipped.add(Skipped(kid.path, FileDecision.SKIP_HIDDEN))
-                    } else {
-                        stack.add(kid)
-                    }
-                } else if (dataset) {
-                    _skipped.add(Skipped(kid.path, FileDecision.SKIP_DATASET_CANDIDATE))
-                } else {
-                    addFile(kid, found)
-                }
-            }
+            for (kid in kids) visit(kid, dataset, stack, found)
         }
-        return found
+    }
+
+    /** Null when the dir is unreadable (error already recorded); empty dirs yield empty arrays. */
+    private fun listKids(dir: File): Array<File>? {
+        val kids: Array<File> =
+            try {
+                dir.listFiles()
+            } catch (_: SecurityException) {
+                null
+            } ?: emptyArray()
+        if (kids.isEmpty() && !dir.canRead()) {
+            _errors.add("unreadable dir: ${dir.path}")
+            return null
+        }
+        return kids
+    }
+
+    private fun visit(
+        kid: File,
+        dataset: Boolean,
+        stack: ArrayDeque<File>,
+        found: MutableList<CrawlEntry>,
+    ) {
+        if (Files.isSymbolicLink(kid.toPath())) {
+            Unit // never follows symlinks
+        } else if (kid.isDirectory) {
+            visitDir(kid, stack)
+        } else if (dataset) {
+            _skipped.add(Skipped(kid.path, FileDecision.SKIP_DATASET_CANDIDATE))
+        } else {
+            addFile(kid, found)
+        }
+    }
+
+    private fun visitDir(
+        kid: File,
+        stack: ArrayDeque<File>,
+    ) {
+        if (kid.isHidden || kid.name.startsWith(".")) {
+            _skipped.add(Skipped(kid.path, FileDecision.SKIP_HIDDEN))
+        } else {
+            stack.add(kid)
+        }
     }
 
     private fun addFile(
@@ -82,7 +118,13 @@ class Crawler(
 fun inodeOf(f: File): Long =
     try {
         (Files.getAttribute(f.toPath(), "unix:ino") as Number).toLong()
-    } catch (_: Exception) {
-        // shortcut: non-Linux fallback breaks move detection; Linux CI and Android both provide unix:ino.
-        f.absolutePath.hashCode().toLong()
+    } catch (_: UnsupportedOperationException) {
+        // No unix attribute view (non-Linux FS): move detection degrades to path matching, never throws.
+        pathHashFallback(f)
+    } catch (_: IOException) {
+        pathHashFallback(f)
+    } catch (_: SecurityException) {
+        pathHashFallback(f)
     }
+
+private fun pathHashFallback(f: File): Long = f.absolutePath.hashCode().toLong()

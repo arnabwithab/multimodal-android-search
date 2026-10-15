@@ -44,23 +44,40 @@ object Searcher {
     /** Strong rows score >= this fraction of the top (design §4 rows). */
     const val STRONG_FRACTION = 0.5
 
-    // shortcut: default data-class equals compares FloatArray by reference; fine
-    // while callers only compare Hit ids/scores, upgrade if Cands are ever diffed.
-
     /**
-     * One retrievable row.
+     * One retrievable row. Plain class (not data): equals/hashCode ignore [vec]
+     * so Set/distinct group by identity + scores, never by FloatArray reference.
      *
      * @param ftsRank raw FTS5 rank carried for the caller; fusion uses
      *   [wordCoverage], the 0..1 normalisation of the word match.
      */
-    data class Cand(
+    class Cand(
         val id: Long,
         val modality: String,
         val kind: String,
         val vec: FloatArray,
         val ftsRank: Double,
         val wordCoverage: Double,
-    )
+    ) {
+        override fun equals(other: Any?): Boolean =
+            other is Cand &&
+                id == other.id &&
+                modality == other.modality &&
+                kind == other.kind &&
+                ftsRank == other.ftsRank &&
+                wordCoverage == other.wordCoverage
+
+        override fun hashCode(): Int {
+            var h = id.hashCode()
+            h = 31 * h + modality.hashCode()
+            h = 31 * h + kind.hashCode()
+            h = 31 * h + ftsRank.hashCode()
+            h = 31 * h + wordCoverage.hashCode()
+            return h
+        }
+
+        override fun toString(): String = "Cand(id=$id, modality=$modality, kind=$kind, ftsRank=$ftsRank, wordCoverage=$wordCoverage)"
+    }
 
     data class Hit(val id: Long, val score: Double, val strong: Boolean)
 
@@ -94,8 +111,8 @@ object Searcher {
                 Hit(cands[i].id, s, strong = false)
             }.sortedByDescending { it.score }
         // Honest empty (design §6): nothing stands out -> nothing marked strong.
-        if (scored.first().score <= 0.0) return scored.map { it.copy(strong = false) }
-        val cutoff = STRONG_FRACTION * scored.first().score
+        // A non-positive top yields an infinite cutoff, so every row lands weak.
+        val cutoff = if (scored.first().score <= 0.0) Double.POSITIVE_INFINITY else STRONG_FRACTION * scored.first().score
         return scored.map { it.copy(strong = it.score >= cutoff) }
     }
 
@@ -106,7 +123,7 @@ object Searcher {
     fun strongCount(sorted: List<Hit>): Int {
         if (sorted.isEmpty()) return 0
         val top = sorted.maxOf { it.score }
-        if (top <= 0.0) return 0 // honest empty: no standout, no strong rows
-        return sorted.count { it.score >= STRONG_FRACTION * top }
+        // honest empty: no standout, no strong rows
+        return if (top <= 0.0) 0 else sorted.count { it.score >= STRONG_FRACTION * top }
     }
 }

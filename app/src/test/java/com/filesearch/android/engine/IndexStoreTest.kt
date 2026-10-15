@@ -20,7 +20,7 @@ class IndexStoreTest {
         store: IndexStore,
         path: String,
         kind: String = "doc",
-    ): Long = store.upsertFile(path = path, kind = kind, size = 100, mtime = 1, inode = 42, device = 7)
+    ): Long = store.upsertFile(FileRow(path = path, kind = kind, size = 100, mtime = 1, inode = 42, device = 7))
 
     @Test
     fun `insert plus segments round-trips with fts match on body`(
@@ -30,18 +30,34 @@ class IndexStoreTest {
             val id = fileId(store, "/a/note.txt")
             val s1 =
                 store.addSegment(
-                    id,
-                    "chunk",
-                    "text",
-                    0.0,
-                    1.0,
-                    "quick fox",
-                    null,
-                    "note.txt",
-                    "the quick brown fox",
-                    "the quick brown fox",
+                    SegmentRow(
+                        id,
+                        "chunk",
+                        "text",
+                        0.0,
+                        1.0,
+                        "quick fox",
+                        null,
+                        "note.txt",
+                        "the quick brown fox",
+                        "the quick brown fox",
+                    ),
                 )
-            val s2 = store.addSegment(id, "chunk", "text", 1.0, 2.0, "slow dog", null, "note.txt", "a slow lazy dog", "a slow lazy dog")
+            val s2 =
+                store.addSegment(
+                    SegmentRow(
+                        id,
+                        "chunk",
+                        "text",
+                        1.0,
+                        2.0,
+                        "slow dog",
+                        null,
+                        "note.txt",
+                        "a slow lazy dog",
+                        "a slow lazy dog",
+                    ),
+                )
             assertTrue(store.matchTerms("body : quick").contains(s1))
             assertFalse(store.matchTerms("body : quick").contains(s2))
             assertEquals(2, store.countSegments(id))
@@ -54,9 +70,22 @@ class IndexStoreTest {
     ) {
         open(dir).use { store ->
             val id = fileId(store, "/a/photo.jpg", "image")
-            store.addSegment(id, "name", "none", null, null, "beach sunset", null, "photo.jpg", "beach sunset", "beach sunset")
+            store.addSegment(
+                SegmentRow(
+                    id,
+                    "name",
+                    "none",
+                    null,
+                    null,
+                    "beach sunset",
+                    null,
+                    "photo.jpg",
+                    "beach sunset",
+                    "beach sunset",
+                ),
+            )
             assertTrue(store.moveFile("/a/photo.jpg", "/b/photo.jpg"))
-            assertEquals(1, store.countSegments(store.upsertFile("/b/photo.jpg", "image", 100, 1, 42, 7)))
+            assertEquals(1, store.countSegments(store.upsertFile(FileRow("/b/photo.jpg", "image", 100, 1, 42, 7))))
             assertEquals(1, store.matchTerms("body : sunset").size)
             assertEquals(0, store.pending(10).count { it.path == "/a/photo.jpg" })
         }
@@ -69,16 +98,18 @@ class IndexStoreTest {
         open(dir).use { store ->
             val id = fileId(store, "/gone.txt")
             store.addSegment(
-                id,
-                "chunk",
-                "text",
-                null,
-                null,
-                "vanishing words",
-                null,
-                "gone.txt",
-                "vanishing words here",
-                "vanishing words here",
+                SegmentRow(
+                    id,
+                    "chunk",
+                    "text",
+                    null,
+                    null,
+                    "vanishing words",
+                    null,
+                    "gone.txt",
+                    "vanishing words here",
+                    "vanishing words here",
+                ),
             )
             assertTrue(store.deleteFile("/gone.txt"))
             assertEquals(0, store.countSegments(id))
@@ -95,7 +126,7 @@ class IndexStoreTest {
             fileId(store, "/keep1.txt")
             fileId(store, "/keep2.txt")
             val gone = fileId(store, "/gone.txt")
-            store.addSegment(gone, "chunk", "text", null, null, "doomed", null, "gone.txt", "doomed words", "doomed words")
+            store.addSegment(SegmentRow(gone, "chunk", "text", null, null, "doomed", null, "gone.txt", "doomed words", "doomed words"))
             assertEquals(1, store.pruneMissing(setOf("/keep1.txt", "/keep2.txt")))
             assertEquals(2, store.countFiles())
             assertTrue(store.matchTerms("body : doomed").isEmpty())
@@ -108,9 +139,9 @@ class IndexStoreTest {
     ) {
         open(dir).use { store ->
             for (k in listOf("video", "audio", "doc", "pdf", "image", "screenshot")) {
-                store.upsertFile("/f.$k", k, 100, 1, k.hashCode().toLong(), 7)
+                store.upsertFile(FileRow("/f.$k", k, 100, 1, k.hashCode().toLong(), 7))
             }
-            store.upsertFile("/done.txt", "doc", 100, 1, 99, 7, state = "done")
+            store.upsertFile(FileRow("/done.txt", "doc", 100, 1, 99, 7, state = "done"))
             val kinds = store.pending(10).map { it.kind }
             assertEquals(listOf("screenshot", "image", "pdf", "doc", "audio", "video"), kinds)
         }
@@ -121,10 +152,10 @@ class IndexStoreTest {
         @TempDir dir: File,
     ) {
         open(dir).use { store ->
-            store.upsertFile("/a.txt", "doc", 100, 1, 42, 7, state = "done")
-            store.upsertFile("/a.txt", "doc", 100, 1, 42, 7)
+            store.upsertFile(FileRow("/a.txt", "doc", 100, 1, 42, 7, state = "done"))
+            store.upsertFile(FileRow("/a.txt", "doc", 100, 1, 42, 7))
             assertTrue(store.pending(10).none { it.path == "/a.txt" })
-            store.upsertFile("/a.txt", "doc", 200, 1, 42, 7)
+            store.upsertFile(FileRow("/a.txt", "doc", 200, 1, 42, 7))
             assertTrue(store.pending(10).any { it.path == "/a.txt" })
         }
     }
@@ -146,7 +177,7 @@ class IndexStoreTest {
     ) {
         open(dir).use { store ->
             fileId(store, "/a.txt")
-            store.upsertFile("/a.txt", "doc", 100, 2, 42, 7, state = "done")
+            store.upsertFile(FileRow("/a.txt", "doc", 100, 2, 42, 7, state = "done"))
             assertEquals(1, store.countFiles())
             assertTrue(store.pending(10).none { it.path == "/a.txt" })
         }
@@ -167,12 +198,30 @@ class IndexStoreTest {
     }
 
     @Test
+    fun `fingerprint toString is exact and parse round-trips`() {
+        val fp = Fingerprint("embgemma2", "r1", "cpu", "fp16", 256, "budgets1")
+        assertEquals("embgemma2@r1 cpu fp16 256 budgets1", fp.toString())
+        assertEquals(fp, Fingerprint.parse(fp.toString()))
+        assertEquals(fp, Fingerprint(fp.toString()))
+    }
+
+    @Test
+    fun `fingerprint parse returns null on malformed`() {
+        assertEquals(null, Fingerprint.parse(""))
+        assertEquals(null, Fingerprint.parse("no-at-sign here"))
+        assertEquals(null, Fingerprint.parse("m@r cpu fp16 notanint b"))
+        assertEquals(null, Fingerprint.parse("m@r cpu fp16 0 b"))
+        assertEquals(null, Fingerprint.parse("m@r cpu fp16 256"))
+        assertEquals(null, Fingerprint.parse("m@ cpu fp16 256 b"))
+    }
+
+    @Test
     fun `fingerprint mismatch resets index and returns false`(
         @TempDir dir: File,
     ) {
         open(dir).use { store ->
             val id = fileId(store, "/a.txt")
-            store.addSegment(id, "chunk", "text", null, null, "old", null, "a.txt", "old words", "old words")
+            store.addSegment(SegmentRow(id, "chunk", "text", null, null, "old", null, "a.txt", "old words", "old words"))
             assertFalse(store.checkFingerprint(Fingerprint("embgemma2@r1 cpu fp16 256 budgets1")))
             assertFalse(store.checkFingerprint(Fingerprint("embgemma2@r2 npu int8 256 budgets2")))
             assertEquals(0, store.countFiles())
@@ -189,16 +238,18 @@ class IndexStoreTest {
             val id = fileId(store, "/notes/bn.txt")
             val seg =
                 store.addSegment(
-                    id,
-                    "chunk",
-                    "text",
-                    null,
-                    null,
-                    "বাংলা নোট",
-                    null,
-                    "bn.txt",
-                    "আমার বাংলা নোট খুঁজুন",
-                    "আমার বাংলা নোট খুঁজুন",
+                    SegmentRow(
+                        id,
+                        "chunk",
+                        "text",
+                        null,
+                        null,
+                        "বাংলা নোট",
+                        null,
+                        "bn.txt",
+                        "আমার বাংলা নোট খুঁজুন",
+                        "আমার বাংলা নোট খুঁজুন",
+                    ),
                 )
             assertTrue(store.matchTerms("বাংলা").contains(seg))
         }
@@ -209,18 +260,21 @@ class IndexStoreTest {
         @TempDir dir: File,
     ) {
         open(dir).use { store ->
-            DriverManager.getConnection("jdbc:sqlite:${store.dbPath}").use { c ->
-                c.createStatement().use { st ->
-                    st.executeQuery("SELECT sql FROM sqlite_master WHERE name='fts'").use { rs ->
-                        assertTrue(rs.next())
-                        val sql = rs.getString(1)
-                        // Exact arch §5 string; fallback is `porter unicode61` (see IndexStore KDoc).
-                        assertTrue(sql.contains("remove_diacritics 2"), "unexpected fts sql: $sql")
-                    }
+            val sql = ftsCreateSql(store.dbPath)
+            // Exact arch §5 string; fallback is `porter unicode61` (see IndexStore KDoc).
+            assertTrue(sql.contains("remove_diacritics 2"), "unexpected fts sql: $sql")
+        }
+    }
+
+    private fun ftsCreateSql(dbPath: String): String =
+        DriverManager.getConnection("jdbc:sqlite:$dbPath").use { c ->
+            c.createStatement().use { st ->
+                st.executeQuery("SELECT sql FROM sqlite_master WHERE name='fts'").use { rs ->
+                    assertTrue(rs.next())
+                    rs.getString(1)
                 }
             }
         }
-    }
 
     @Test
     fun `foreign keys are enforced on segments`(
@@ -228,7 +282,7 @@ class IndexStoreTest {
     ) {
         open(dir).use { store ->
             assertThrows<SQLException> {
-                store.addSegment(999999, "chunk", "text", null, null, "orphan", null, "x", "orphan body", "orphan body")
+                store.addSegment(SegmentRow(999999, "chunk", "text", null, null, "orphan", null, "x", "orphan body", "orphan body"))
             }
         }
     }
@@ -238,9 +292,9 @@ class IndexStoreTest {
         @TempDir dir: File,
     ) {
         open(dir).use { store ->
-            store.upsertFile("/p1.txt", "pdf", 100, 1, 1, 7, state = "pending")
-            store.upsertFile("/p2.txt", "pdf", 100, 1, 2, 7, state = "partial")
-            store.upsertFile("/d.txt", "doc", 100, 1, 3, 7, state = "done")
+            store.upsertFile(FileRow("/p1.txt", "pdf", 100, 1, 1, 7, state = "pending"))
+            store.upsertFile(FileRow("/p2.txt", "pdf", 100, 1, 2, 7, state = "partial"))
+            store.upsertFile(FileRow("/d.txt", "doc", 100, 1, 3, 7, state = "done"))
             val counts = store.unfinishedCounts()
             assertEquals(1, counts["pending"])
             assertEquals(1, counts["partial"])

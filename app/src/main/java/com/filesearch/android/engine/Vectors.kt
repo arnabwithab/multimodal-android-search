@@ -11,56 +11,94 @@ import kotlin.math.sqrt
  * change re-embeds everything instead of mixing dims.
  */
 object Vectors {
+    private const val F32_SIGN_SHIFT = 16
+    private const val F32_SIGN_MASK = 0x8000
+    private const val F32_EXP_SHIFT = 23
+    private const val F32_EXP_MASK = 0xff
+    private const val F32_MANT_MASK = 0x7fffff
+    private const val F32_EXP_BIAS = 127
+    private const val F32_HIDDEN_BIT = 0x800000
+    private const val F32_INF_BITS = 0x7f800000
+    private const val F16_EXP_BIAS = 15
+    private const val F16_EXP_MASK = 0x1f
+    private const val F16_EXP_MAX = 31
+    private const val F16_EXP_SHIFT = 10
+    private const val F16_INF_BITS = 0x7c00
+    private const val F16_MANT_MASK = 0x3ff
+    private const val F16_QNAN_BIT = 0x0200
+    private const val F16_ROUND_BIT = 0x1000
+    private const val F16_SUBNORMAL_SHIFT_BASE = 14
+    private const val F16_SUBNORMAL_MAX_SHIFT = 25
+    private const val F32_TO_F16_MANT_SHIFT = 13
+    private const val U16_MASK = 0xffff
+    private const val F16_SUBNORMAL_SCALE = 5.9604645e-8f // 2^-24, exact in float32
+
     /** Float32 -> IEEE-754 half bits (round-half-up; overflow saturates to Inf). */
     fun floatToFp16Bits(f: Float): Short {
         val bits = f.toBits()
-        val sign = (bits ushr 16) and 0x8000
-        val exp = (bits ushr 23) and 0xff
-        val mant = bits and 0x7fffff
+        val sign = (bits ushr F32_SIGN_SHIFT) and F32_SIGN_MASK
+        val exp = (bits ushr F32_EXP_SHIFT) and F32_EXP_MASK
+        val mant = bits and F32_MANT_MASK
         return when {
-            exp == 0xff -> {
+            exp == F32_EXP_MASK -> {
                 // Inf/NaN: keep payload so NaN stays NaN.
-                val payload = mant ushr 13
-                val h = sign or 0x7c00 or payload
-                if (payload == 0 && mant != 0) (h or 0x0200).toShort() else h.toShort()
+                val payload = mant ushr F32_TO_F16_MANT_SHIFT
+                val h = sign or F16_INF_BITS or payload
+                if (payload == 0 && mant != 0) (h or F16_QNAN_BIT).toShort() else h.toShort()
             }
             exp == 0 -> sign.toShort() // zero or f32-subnormal: flush to signed zero
             else -> {
-                val e16 = exp - 127 + 15
-                if (e16 >= 31) {
-                    (sign or 0x7c00).toShort()
-                } else if (e16 <= 0) {
-                    // Half-subnormal (or underflow to zero): exact power-of-two scale.
-                    val full = mant or 0x800000
-                    val shift = 14 - e16
-                    if (shift >= 25) {
-                        sign.toShort()
-                    } else {
-                        val half = 1 shl (shift - 1)
-                        val rest = full and ((1 shl shift) - 1)
-                        var m = full ushr shift
-                        if (rest > half || (rest == half && m and 1 == 1)) m++
-                        (sign or (m and 0x3ff)).toShort()
-                    }
-                } else {
-                    var m = mant + 0x1000 // round the 13 dropped bits
-                    var e = e16
-                    if (m and 0x800000 != 0) {
-                        m = 0
-                        e++ // mantissa carry
-                    }
-                    if (e >= 31) (sign or 0x7c00).toShort() else (sign or (e shl 10) or (m ushr 13)).toShort()
+                val e16 = exp - F32_EXP_BIAS + F16_EXP_BIAS
+                when {
+                    e16 >= F16_EXP_MAX -> (sign or F16_INF_BITS).toShort()
+                    e16 <= 0 -> subnormalHalfBits(sign, mant, e16)
+                    else -> normalHalfBits(sign, mant, e16)
                 }
             }
         }
     }
 
+    /** Half-subnormal arm (or underflow to zero): exact power-of-two scale. */
+    private fun subnormalHalfBits(
+        sign: Int,
+        mant: Int,
+        e16: Int,
+    ): Short {
+        val full = mant or F32_HIDDEN_BIT
+        val shift = F16_SUBNORMAL_SHIFT_BASE - e16
+        if (shift >= F16_SUBNORMAL_MAX_SHIFT) return sign.toShort()
+        val half = 1 shl (shift - 1)
+        val rest = full and ((1 shl shift) - 1)
+        var m = full ushr shift
+        if (rest > half || (rest == half && m and 1 == 1)) m++
+        return (sign or (m and F16_MANT_MASK)).toShort()
+    }
+
+    /** Normal-range arm with round-half-up on the 13 dropped bits. */
+    private fun normalHalfBits(
+        sign: Int,
+        mant: Int,
+        e16: Int,
+    ): Short {
+        var m = mant + F16_ROUND_BIT
+        var e = e16
+        if (m and F32_HIDDEN_BIT != 0) {
+            m = 0
+            e++ // mantissa carry
+        }
+        return if (e >= F16_EXP_MAX) {
+            (sign or F16_INF_BITS).toShort()
+        } else {
+            (sign or (e shl F16_EXP_SHIFT) or (m ushr F32_TO_F16_MANT_SHIFT)).toShort()
+        }
+    }
+
     /** IEEE-754 half bits -> Float32 (exact for all finite values). */
     fun fp16BitsToFloat(h: Short): Float {
-        val bits = h.toInt() and 0xffff
-        val sign = (bits and 0x8000) shl 16
-        val exp = (bits ushr 10) and 0x1f
-        val mant = bits and 0x3ff
+        val bits = h.toInt() and U16_MASK
+        val sign = (bits and F32_SIGN_MASK) shl F32_SIGN_SHIFT
+        val exp = (bits ushr F16_EXP_SHIFT) and F16_EXP_MASK
+        val mant = bits and F16_MANT_MASK
         return when {
             exp == 0 ->
                 if (mant == 0) {
@@ -68,16 +106,21 @@ object Vectors {
                 } else {
                     // Subnormal: mant * 2^-24, exact in float32.
                     val s = if (sign != 0) -1.0f else 1.0f
-                    s * mant.toFloat() * 5.9604645e-8f
+                    s * mant.toFloat() * F16_SUBNORMAL_SCALE
                 }
-            exp == 0x1f -> Float.fromBits(sign or 0x7f800000 or (mant shl 13)) // Inf/NaN
-            else -> Float.fromBits(sign or ((exp - 15 + 127) shl 23) or (mant shl 13))
+            exp == F16_EXP_MASK -> Float.fromBits(sign or F32_INF_BITS or (mant shl F32_TO_F16_MANT_SHIFT)) // Inf/NaN
+            else -> Float.fromBits(sign or ((exp - F16_EXP_BIAS + F32_EXP_BIAS) shl F32_EXP_SHIFT) or (mant shl F32_TO_F16_MANT_SHIFT))
         }
     }
 
     /**
      * Slice to [dim] (MRL truncation) and L2 re-normalise. Query and docs must
      * share the dim (256d v1); larger targets than the input are rejected.
+     *
+     * Measured caveat (Oct 2026 CPU probe, `google/embeddinggemma-300m` real
+     * weights): naive truncation drifts mean 0.074 / max 0.177 vs full-dim
+     * cosine, so production MUST use the model's native MRL-256 output; this
+     * function is for tests/fallback only.
      */
     fun truncateRenorm(
         v: FloatArray,

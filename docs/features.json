@@ -17,12 +17,12 @@
       "description": "Folder walk (metadata only), Rules filter, inode-aware sync/move/prune, dataset detection. All-language file names.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/CrawlerTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/CrawlerTest.kt"
         ],
         "notes": "16 tests green via make test. review fixes: move+modify re-embed, media-only dataset count"
       },
@@ -48,12 +48,12 @@
       "description": "Downscale + EXIF, screenshot detect, ML Kit OCR as FTS-only (no vector).",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/PrepareTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/PrepareTest.kt"
         ],
         "notes": "14 tests green via make test. review fixes: icon=max-dim rule, RAW MIME/ext, path-dir screenshot"
       },
@@ -74,12 +74,12 @@
       "description": "PdfiumAndroid text/image per page, glyph-order and lost-letter handling, two-pass long files.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/PdfTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/PdfTest.kt"
         ],
         "notes": "18 tests green via make test. review fixes: twoPass tail cap, 9-script vowel ranges, ZWSP split"
       },
@@ -100,12 +100,12 @@
       "description": "txt/md/html/docx/odt/rtf to 1800/200 chunks, digit-dump keyword-only rule.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/ChunkTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/ChunkTest.kt"
         ],
         "notes": "20 tests green via make test; greptile-reviewed, fixes re-reviewed PASS"
       },
@@ -120,12 +120,12 @@
       "description": "16kHz mono 30s/25s windows, silence gate, streaming decode.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/AudioTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/AudioTest.kt"
         ],
         "notes": "9 tests green via make test; greptile-reviewed, fixes re-reviewed PASS"
       },
@@ -140,12 +140,12 @@
       "description": "1fps extract, aHash dedup to ~1/3s, cap 1200, soundtrack via F005.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/VideoTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/VideoTest.kt"
         ],
         "notes": "13 tests green via make test; greptile-reviewed, fixes re-reviewed PASS"
       },
@@ -160,12 +160,12 @@
       "description": "Room/SQLite files+segments+fts, migrations, fingerprint reset, scope support.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/IndexStoreTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/IndexStoreTest.kt"
         ],
         "notes": "14 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; exact arch §5 FTS5 tokenizer verified on bundled SQLite"
       },
@@ -180,14 +180,14 @@
       "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, ≥6 scripts in evals.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/design.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/VectorsTest.kt",
-          "app/src/test/java/com/digup/android/engine/SearchTextTest.kt",
-          "app/src/test/java/com/digup/android/engine/SearcherTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/VectorsTest.kt",
+          "app/src/test/java/com/filesearch/android/engine/SearchTextTest.kt",
+          "app/src/test/java/com/filesearch/android/engine/SearcherTest.kt"
         ],
         "notes": "26 tests green via make test (Vectors 7, SearchText 9, Searcher 10); greptile-reviewed, fixes re-reviewed PASS; eval R@1 gate waits on F013 Embedder"
       },
@@ -202,12 +202,12 @@
       "description": "WorkManager first pass, MediaStore observer, thermal/Doze guards, watchdog, estimates.",
       "status": "completed",
       "priority": "medium",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/PowerTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/PowerTest.kt"
         ],
         "notes": "15 JVM tests passing; greptile-reviewed, fixes re-reviewed PASS; WorkManager/Doze device E2E remains a gap"
       },
@@ -222,12 +222,12 @@
       "description": "On-device default, opt-in cloud STT/TTS + transcript boost rows, key storage, cost meter.",
       "status": "completed",
       "priority": "medium",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/design.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/VoiceTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/VoiceTest.kt"
         ],
         "notes": "11 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; mic/cloud/device E2E remains a gap"
       },
@@ -253,12 +253,12 @@
       "description": "Compose SearchScreen, status sheet, settings (folders, battery, voice, models, wipe). 3 screens only.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/app",
+      "module": "app/src/main/java/com/filesearch/android/app",
       "design_doc": "docs/design.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/app/UiStateTest.kt"
+          "app/src/test/java/com/filesearch/android/app/UiStateTest.kt"
         ],
         "notes": "35 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; Compose binding + Paparazzi on device"
       },
@@ -273,12 +273,12 @@
       "description": "Staged download (270M→440M→740M), per-SoC AOT select, SHA verify, reference-vector gate.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/ModelTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/ModelTest.kt"
         ],
         "notes": "19 tests green via make test; greptile-reviewed, fixes re-reviewed PASS"
       },
@@ -293,12 +293,12 @@
       "description": "LiteRT-LM interface embedTexts/embedImages/embedAudio, single-mutex serialisation, MRL 256d truncate+renorm, fingerprint model@rev runtime dtype dim budgets + resetAll.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/EmbedderTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/EmbedderTest.kt"
         ],
         "notes": "7 tests green via make test; greptile-reviewed, re-reviewed PASS; reference-vector gate needs real .litertlm; eval R@1 SKIP until runner lands"
       },
@@ -313,12 +313,12 @@
       "description": "job batching (images x8 else x1), overlap prepare+embed, finishLongFiles, pending/unfinished wiring to IndexStore.",
       "status": "completed",
       "priority": "high",
-      "module": "app/src/main/java/com/digup/android/engine",
+      "module": "app/src/main/java/com/filesearch/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
         "status": "passing",
         "files": [
-          "app/src/test/java/com/digup/android/engine/IndexerTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/IndexerTest.kt"
         ],
         "notes": "18 tests green via make test; greptile-reviewed, fixes re-reviewed PASS"
       },

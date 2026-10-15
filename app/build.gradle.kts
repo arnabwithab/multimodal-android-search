@@ -2,7 +2,7 @@ plugins {
     kotlin("jvm") version "2.0.21"
 }
 
-group = "com.digup.android"
+group = "com.filesearch.android"
 version = "0.1.0"
 
 repositories {

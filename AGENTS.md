@@ -50,7 +50,7 @@ make clean                       # removes build/, .gradle caches, local model d
 ```
 multimodal-search-for-android/
 ├── app/
-│   ├── src/main/java/com/digup/android/
+│   ├── src/main/java/com/filesearch/android/
 │   │   ├── app/                # Compose: SearchScreen, StatusSheet, Settings, voice buttons
 │   │   ├── engine/             # Crawler, Sync, Prepare, Embedder, Indexer, IndexStore,
 │   │   │                       # Searcher, Vectors, SearchText, Voice, Power
@@ -83,11 +83,15 @@ multimodal-search-for-android/
 ### Kotlin
 
 - Formatter: ktlint; Linter: detekt (includes import order, complexity caps).
-- Naming: camelCase functions/vars/properties, PascalCase classes/objects, SCREAMING_SNAKE constants; packages lowercase (`com.digup.android.engine`).
+- Naming: camelCase functions/vars/properties, PascalCase classes/objects, SCREAMING_SNAKE constants; packages lowercase (`com.filesearch.android.engine`).
 - One embed session at a time — LiteRT-LM calls serialised behind a single mutex; decode on `Dispatchers.IO`, never on Main.
 - Never block the UI thread on embedding or DB; search exposes `Flow<List<SearchHit>>` with debounce + `prefixLast` FTS while typing.
 - Logging via Timber (never `println`); no PII or file contents in logs — paths truncated to basename in release.
 - Errors are values at trust boundaries: unreadable/locked/failed files get `state + detail` rows, never crash the queue.
+
+### Naming
+
+- No `digup` naming anywhere in code, paths, or identifiers — the package is `com.filesearch.android`. Docs may credit DigUp as inspiration (attribution prose only), never as a name.
 
 ### General
 

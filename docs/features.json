@@ -3,12 +3,12 @@
   "last_updated": "2026-10-15",
   "summary": {
     "total": 14,
-    "completed": 5,
+    "completed": 6,
     "in_progress": 0,
-    "planned": 9,
+    "planned": 8,
     "tests_passing": 90,
     "tests_failing": 0,
-    "tests_missing": 9
+    "tests_missing": 8
   },
   "features": [
     {
@@ -138,21 +138,21 @@
       "id": "F006",
       "name": "Video keyframes + soundtrack",
       "description": "1fps extract, aHash dedup to ~1/3s, cap 1200, soundtrack via F005.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
           "app/src/test/java/com/digup/android/engine/VideoTest.kt"
         ],
-        "notes": "MTS lead-back covered on device"
+        "notes": "13 tests green via make test; greptile-reviewed, fixes re-reviewed PASS"
       },
       "subtasks": [],
       "notes": "",
       "added": "2026-10-14",
-      "completed": null
+      "completed": "2026-10-15"
     },
     {
       "id": "F007",
@@ -177,7 +177,7 @@
     {
       "id": "F008",
       "name": "Searcher fusion",
-      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, \u22656 scripts in evals.",
+      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, ≥6 scripts in evals.",
       "status": "planned",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",
@@ -268,7 +268,7 @@
     {
       "id": "F012",
       "name": "Model manager + SoC picker",
-      "description": "Staged download (270M\u2192440M\u2192740M), per-SoC AOT select, SHA verify, reference-vector gate.",
+      "description": "Staged download (270M→440M→740M), per-SoC AOT select, SHA verify, reference-vector gate.",
       "status": "planned",
       "priority": "high",
       "module": "app/src/main/java/com/digup/android/engine",

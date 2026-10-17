@@ -192,7 +192,7 @@
         "notes": "26 tests green via make test (Vectors 7, SearchText 9, Searcher 10); greptile-reviewed, fixes re-reviewed PASS; eval R@1 gate waits on F013 Embedder"
       },
       "subtasks": [],
-      "notes": "eval bundle: EvalRunner + paraphrase corpus + parity probe (meaning-only R@1 harness, real-weights gate pending)",
+      "notes": "eval bundle: EvalRunner + paraphrase corpus + parity probe (meaning-only R@1 harness, real-weights gate pending); R@1 0.50 / R@3 0.67 meaning-only on real 300m weights — FTS backup mandatory, vectors are recall contributors",
       "added": "2026-10-14",
       "completed": "2026-10-15"
     },
@@ -303,7 +303,7 @@
         "notes": "7 tests green via make test; greptile-reviewed, re-reviewed PASS; reference-vector gate needs real .litertlm; eval R@1 SKIP until runner lands"
       },
       "subtasks": [],
-      "notes": "eval bundle: EvalRunner + paraphrase corpus + parity probe (meaning-only R@1 harness, real-weights gate pending)",
+      "notes": "eval bundle: EvalRunner + paraphrase corpus + parity probe (meaning-only R@1 harness, real-weights gate pending); R@1 0.50 / R@3 0.67 meaning-only on real 300m weights — FTS backup mandatory, vectors are recall contributors",
       "added": "2026-10-15",
       "completed": "2026-10-15"
     },

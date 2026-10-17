@@ -18,24 +18,34 @@ Mirrors DigUp's `Indexer / LlamaRuntime / IndexStore / Searcher` split, minus th
 
 ## 2. Model layer (the important choice)
 
-Verified on the Hub (Oct 2026 CPU probe): `google/embeddinggemma-300m` text
-model exists (768d). No `embeddinggemma-2` id exists on the Hub — the
-`litert-community/embeddinggemma-2-*-litert-lm` ids previously listed here
-were unverified and are removed.
+Verified on the Hub 2026-10-17 (`hf models list` + `info` + cards, this
+session): `google/embeddinggemma-2` exists (multimodal, Apache-2.0), plus
+three `litert-community` `.litertlm` distributions. The prior "no
+`embeddinggemma-2` id exists" claim was stale and is corrected below.
 
-| HF repo | Params | Download | Use for |
+| HF repo | Params / modalities | Native dim (MRL) | Use for |
 |---|---|---|---|
-| `google/embeddinggemma-300m` | 300M | size unverified (prior ~165MB was an estimate) | queries + doc/code text. Ship first, keep resident while typing |
-| vision `.litertlm` variant | UNVERIFIED — verify against the Hub before shipping; F012 picker assumptions unconfirmed | estimate (prior ~388MB total was an estimate) | images, PDF renders, video frames. Lazy-load |
-| audio `.litertlm` variant | UNVERIFIED — verify against the Hub before shipping; F012 picker assumptions unconfirmed | estimate (prior ~485MB total was an estimate) | audio windows, video soundtracks. Behind "enable audio search" |
+| `google/embeddinggemma-2` | 740M (270M text + 170M vision + 300M audio); text, images, video, audio | 768d (128/256/512/768) | reference + sentence-transformers parity baseline |
+| `litert-community/embeddinggemma-2-text-270m-litert-lm` | 270M; text only | 768d (128/256/512/768) | queries + doc/code text. Ship first, keep resident while typing |
+| `litert-community/embeddinggemma-2-text-vision-440m-litert-lm` | 440M (270M text + 170M vision); text + images | 768d (128/256/512/768) | images, PDF renders, video frames. Lazy-load |
+| `litert-community/embeddinggemma-2-740m-litert-lm` | 740M; text + images + video + audio | 768d (128/256/512/768) | audio windows, video soundtracks. Behind "enable audio search" |
+| `google/embeddinggemma-300m` | 300M; text only (prior generation) | 768d (128/256/512/768) | fallback / Linux eval parity baseline only |
 
-Each repo has a generic CPU/GPU file + AOT files per SoC (UNVERIFIED filenames such as `Qualcomm_SM8xxx`, `Tensor_G5/G6`, `MT699x` — verify against the Hub before shipping; F012 picker assumptions unconfirmed). Picker at first run: exact SoC match → generic NPU → GPU → XNNPACK CPU. Backends: Pixel TPU/NPU → Qualcomm NPU → GPU → CPU, with auto-fallback when a delegate rejects ops (split execution hurts more than it helps — same lesson as NNAPI/GPU delegate docs).
+Each `embeddinggemma-2-*-litert-lm` repo ships a generic `.litertlm` plus
+per-SoC AOT files (verified file listing 2026-10-17; prefix =
+`embeddinggemma-2-<variant>`): `Google_Tensor_G5`, `Google_Tensor_G6`,
+`Intel_PTL`, `MediaTek_MT6991`, `MediaTek_MT6993`, `Qualcomm_QCS8275`,
+`Qualcomm_SM8550`, `Qualcomm_SM8650`, `Qualcomm_SM8750`,
+`Qualcomm_SM8850`. No separate audio-only `.litertlm` exists — audio is
+covered only by the full 740M repo, so the staged-download plan
+(270M → 440M → 740M) is NOT blocked. Still unverified: per-file download
+sizes, per-file SHAs, on-device latency/RSS per SoC. Picker at first run: exact SoC match → generic NPU → GPU → XNNPACK CPU. Backends: Pixel TPU/NPU → Qualcomm NPU → GPU → CPU, with auto-fallback when a delegate rejects ops (split execution hurts more than it helps — same lesson as NNAPI/GPU delegate docs).
 
 Input contracts (from model cards + DigUp):
 
 - Signatures: text tokens `128/256/512/1024/2048/8192`; vision soft tokens `70/140` (use 140 photo, 280 screenshot→140×2 equiv, 70 video frame); audio streamed, ~12 soft tokens.
 - Task prefixes on text only: `task: search result | query:`, `title: {t} | text: {c}`, `task: code retrieval | query:` (later). Media inputs take no prefix.
-- MRL truncation: store **256d** (re-normalised after slicing). 768d → 1.5KB/vec fp16; 256d → 0.5KB. Query and docs must share the dim. 128d is text-only.
+- MRL truncation: store **256d** (re-normalised after slicing). 768d → 1.5KB/vec fp16; 256d → 0.5KB. Query and docs must share the dim. 128d is text-sufficient; valid but degraded on media — ship 256d.
 - Never float16 compute (activations overflow → silent NaNs); LiteRT QAT files already handle this. Keep vectors fp16 for storage, float32 for scoring.
 - Fingerprint = `model@rev runtime dtype dim budgets`. Change → `resetAll()` + re-embed. Ship a reference-vector test (fixed inputs → cosine ≥0.999 vs HF `sentence-transformers` output) that blocks model/SDK bumps.
 

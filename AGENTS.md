@@ -19,7 +19,7 @@ Design truth: `docs/design.md` (behaviour, UX, privacy) and `docs/architecture.m
 
 ## Tech Stack
 
-- App: Kotlin + Jetpack Compose (Material 3), single `app/` module, `minSdk 30`
+- App: Kotlin + Jetpack Compose (Material 3), `android/` shell module (minSdk 30, target/compile 36) + JVM-only `app/` engine module (Compose binding is later device work)
 - Language: Kotlin, coroutines + Flow; DI: Hilt (or manual if smaller — justify)
 - AI: LiteRT-LM SDK (`.litertlm`: text-270M / text-vision-440M / full-740M), XNNPACK CPU fallback, per-SoC NPU AOT packs
 - Database: Room over SQLite + FTS5 (`porter unicode61 remove_diacritics 2 categories 'L* N* Co M*'`), vectors as fp16/MRL-256 BLOBs
@@ -49,14 +49,16 @@ make clean                       # removes build/, .gradle caches, local model d
 
 ```
 multimodal-search-for-android/
-├── app/
+├── android/             # device shell: MainActivity (plain Activity v1) + manifest (com.android.application, SDK 36/min 30)
+│   ├── src/main/java/com/filesearch/android/  # MainActivity.kt (no engine dep yet — see module build file)
+│   └── build.gradle.kts
+├── app/                    # JVM-only engine (kotlin("jvm")): Searcher, Indexer, Vectors, … + JVM tests
 │   ├── src/main/java/com/filesearch/android/
-│   │   ├── app/                # Compose: SearchScreen, StatusSheet, Settings, voice buttons
+│   │   ├── app/                # UiState (Compose screens live in android/ later)
 │   │   ├── engine/             # Crawler, Sync, Prepare, Embedder, Indexer, IndexStore,
 │   │   │                       # Searcher, Vectors, SearchText, Voice, Power
 │   │   └── di/                 # Hilt modules
 │   ├── src/test/java/.../      # mirrors engine/ 1:1 (JUnit5 + Robolectric, Linux-safe)
-│   ├── src/androidTest/java/   # device-only: permissions, MediaStore, delegates, voice E2E
 │   └── build.gradle.kts
 ├── docs/
 │   ├── design.md               # product behaviour, UX, privacy (wins on conflicts)

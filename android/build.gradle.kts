@@ -4,8 +4,8 @@
 // Engine sharing comes later (extract engine to a Kotlin library module); the
 // shell only needs to install + launch for now.
 plugins {
-    id("com.android.application") version "8.7.3"
-    kotlin("android") version "2.0.21"
+    id("com.android.application") version "8.10.1"
+    kotlin("android") version "2.3.21"
 }
 
 android {
@@ -24,7 +24,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
     }
+}
+
+dependencies {
+    // Pinned (not latest.release) for reproducible bench numbers.
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
 }

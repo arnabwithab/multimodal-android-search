@@ -2,8 +2,8 @@
   "project": "multimodal-search-for-android",
   "last_updated": "2026-10-15",
   "summary": {
-    "total": 14,
-    "completed": 14,
+    "total": 15,
+    "completed": 15,
     "in_progress": 0,
     "planned": 0,
     "tests_passing": 255,
@@ -326,6 +326,26 @@
       "notes": "",
       "added": "2026-10-15",
       "completed": "2026-10-15"
+    },
+    {
+      "id": "F015",
+      "name": "On-device benchmark (SM8635 generic pack)",
+      "description": "First real-device smoke bench: generic 270M .litertlm on Realme GT 6 (SM8635), backend accept/reject + init/infer/RSS. Single query, not the eval.",
+      "status": "completed",
+      "priority": "high",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "passing",
+        "files": [
+          "docs/bench/sm8635-generic.md"
+        ],
+        "notes": "Device-only smoke test (no JVM unit test possible — needs LiteRT-LM + NPU); verified by the on-device run itself: NPU accepted, init 9718ms, infer 211ms, RSS 739MB. Rerun via make bench-device."
+      },
+      "subtasks": [],
+      "notes": "NPU accepted generic pack first try; GPU/CPU not probed. MemAvailable ~2.0GB at run; re-run may need freed memory on a fuller phone.",
+      "added": "2026-10-18",
+      "completed": "2026-10-18"
     }
   ]
 }

@@ -1,13 +1,19 @@
 package com.filesearch.android
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -19,6 +25,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -29,6 +37,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.filesearch.android.app.formatRemaining
+import com.filesearch.android.app.SettingsState
 import com.filesearch.android.engine.Embedder
 import com.filesearch.android.ui.FileSearchApp
 import com.filesearch.android.ui.KindProgress
@@ -42,6 +51,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 // v1 shell: bench mode (--ez bench true, see scripts/bench-device.sh) keeps the
@@ -62,13 +72,14 @@ class MainActivity : ComponentActivity() {
         }
 
     /** Enqueues one index-now run (shared by the button, auto-start, and the indexnow seam). */
-    private fun requestIndexNow() {
+    private fun requestIndexNow(chargerOnly: Boolean = false) {
         val req =
             OneTimeWorkRequestBuilder<IndexWorker>()
                 .setInputData(
                     Data.Builder()
                         .putString(IndexWorker.IN_MODE, IndexWorker.MODE_INDEX_NOW)
                         .putInt(IndexWorker.IN_MAX_FILES, INDEX_NOW_CAP)
+                        .putBoolean(IndexWorker.IN_CHARGER_ONLY, chargerOnly)
                         .build(),
                 )
                 .build()
@@ -81,6 +92,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Draw behind system bars (transparent) — FileSearchApp pads below the
+        // status bar itself; without this the content overlaps opaque chrome.
+        enableEdgeToEdge()
         if (intent.getBooleanExtra("bench", false)) {
             val view = TextView(this)
             view.text = "Benchmark running (one query)…"
@@ -123,26 +137,59 @@ class MainActivity : ComponentActivity() {
         }
         // Verification seam (like bench mode): headless runs enqueue via adb.
         Log.i(TAG, "onCreate indexnow=" + intent.getBooleanExtra("indexnow", false))
-        if (intent.getBooleanExtra("indexnow", false)) requestIndexNow()
+        if (intent.getBooleanExtra("indexnow", false)) {
+            requestIndexNow(getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE).getBoolean(KEY_CHARGER, false))
+        }
         setContent { HostApp() }
     }
 
     @Composable
     private fun HostApp() {
+        val settingsPrefs = remember { getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE) }
         val voice = remember { VoiceService(this) }
         var query by remember { mutableStateOf("") }
         var expanded by remember { mutableStateOf(false) }
-        var chargerOnly by remember { mutableStateOf(false) }
-        var wifiOnlyModels by remember { mutableStateOf(true) }
-        var toggles by remember { mutableStateOf(VoiceService.defaultToggles()) }
+        var chargerOnly by remember { mutableStateOf(settingsPrefs.getBoolean(KEY_CHARGER, false)) }
+        var wifiOnlyModels by remember { mutableStateOf(settingsPrefs.getBoolean(KEY_WIFI, true)) }
+        var toggles by remember {
+            mutableStateOf(
+                VoiceToggles(
+                    cloudStt = settingsPrefs.getBoolean(KEY_STT, false),
+                    cloudTts = settingsPrefs.getBoolean(KEY_TTS, false),
+                ),
+            )
+        }
         var userPaused by remember { mutableStateOf(false) }
-        // shortcut: plain display names only — real SAF picker + persisted permissions land later.
-        var folders by remember { mutableStateOf(listOf("Downloads", "Pictures", "Documents")) }
-        // F022: live index wiring (progress + Index-now live here; the button moves
-        // into StatusSheetContent as an onIndexNow callback when the sibling wires it).
+        var tab by rememberSaveable { mutableStateOf(0) }
+        var cloudKeyError by remember { mutableStateOf<String?>(null) }
+        // SAF tree URIs, persisted + permission-persisted on pick; empty until
+        // the user adds one. Auto-index of these trees is F023 — this list is
+        // the remembered watch-list, picked + listed on-device today.
+        val initialFolders: List<String> =
+            settingsPrefs.getStringSet(KEY_FOLDERS, null)?.sorted() ?: emptyList()
+        var folders by remember { mutableStateOf(initialFolders) }
+        val folderPicker =
+            rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+                if (uri == null) return@rememberLauncherForActivityResult
+                runCatching {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
+                val updated = (folders + uri.toString()).distinct().sorted()
+                folders = updated
+                settingsPrefs.edit().putStringSet(KEY_FOLDERS, updated.toSet()).apply()
+            }
+        // F022: live index wiring (progress + Index-now button live in this
+        // status tab above the sheet; the sheet owns Pause/Resume + Back).
         var indexDone by remember { mutableStateOf(0) }
         var indexTotal by remember { mutableStateOf(0) }
         var indexState by remember { mutableStateOf("not started") }
+        // Poll-loop run key: each enqueue bumps this, restarting the
+        // LaunchedEffect below so a fresh terminal break still observes the
+        // next Resume run.
+        var enqueueCounter by remember { mutableStateOf(0) }
         // F024: live search rows (DeviceSearch over DeviceIndexStore + LiteRT query
         // embed; kindHint stays null until kind-hint parsing lands in F023+).
         var strongRows by remember { mutableStateOf<List<SearchRowUi>>(emptyList()) }
@@ -190,8 +237,39 @@ class MainActivity : ComponentActivity() {
         }
 
         fun enqueueIndexNow() {
-            requestIndexNow()
+            requestIndexNow(chargerOnly)
             indexState = "starting…"
+            enqueueCounter++
+        }
+
+        // Result-open: thumbKey is "$kind:$segId" (DeviceSearch.toRow); the
+        // stored files.path IS the MediaStore content URI, so ACTION_VIEW
+        // opens it directly — no FileProvider needed. DB read off Main;
+        // unresolvable row or no viewer app -> toast, never a crash.
+        val openScope = rememberCoroutineScope()
+        fun openResult(row: SearchRowUi) {
+            openScope.launch {
+                val uri =
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            val segId = row.thumbKey.substringAfterLast(':').toLong()
+                            searchStore.readSegments().firstOrNull { it.id == segId }?.path?.let(Uri::parse)
+                        }.getOrNull()
+                    }
+                if (uri == null) {
+                    Toast.makeText(this@MainActivity, "No app can open this file", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+                val mime = runCatching { this@MainActivity.contentResolver.getType(uri) }.getOrNull() ?: "image/*"
+                try {
+                    this@MainActivity.startActivity(
+                        Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                    )
+                } catch (_: ActivityNotFoundException) {
+                    Toast.makeText(this@MainActivity, "No app can open this file", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
 
         // Auto-start once on first launch (SharedPreferences flag), gated on
@@ -213,7 +291,9 @@ class MainActivity : ComponentActivity() {
         }
 
         // Poll the unique work (no new deps: WorkManager LiveData needs lifecycle-runtime-compose).
-        LaunchedEffect(Unit) {
+        // Breaks on terminal state; each enqueue bumps enqueueCounter which
+        // restarts this effect, so a post-Pause Resume run is still observed.
+        LaunchedEffect(enqueueCounter) {
             while (true) {
                 try {
                     val infos =
@@ -236,15 +316,17 @@ class MainActivity : ComponentActivity() {
                                 indexTotal = out.getInt(IndexWorker.OUT_TOTAL, indexTotal)
                                 val pause = out.getString(IndexWorker.OUT_PAUSE_REASON)
                                 indexState = if (pause != null && pause != PauseReason.OK.name) "paused: $pause" else "done"
+                                break
                             }
                             WorkInfo.State.FAILED -> {
                                 indexState = "failed: ${(out.getString(IndexWorker.OUT_ERROR) ?: "unknown").take(120)}"
+                                break
                             }
                             WorkInfo.State.CANCELLED -> {
                                 indexState = "cancelled"
+                                break
                             }
                         }
-                        if (info.state.isFinished) break
                     }
                 } catch (t: Throwable) {
                     Log.w(TAG, "index poll: ${t.javaClass.simpleName}")
@@ -274,7 +356,111 @@ class MainActivity : ComponentActivity() {
             else -> null
         }
 
+        // Pause actually pauses: cancel the unique work (partial progress is
+        // kept in the DB). Resume clears the flag and re-enqueues; device
+        // guards re-apply inside the worker, so a still-hot phone pauses again.
+        fun togglePause() {
+            if (paused) {
+                userPaused = false
+                enqueueIndexNow()
+            } else {
+                // Device pause isn't the user's choice — only claim it when the device is OK.
+                if (pauseCheck() == PauseReason.OK) userPaused = true
+                WorkManager.getInstance(this).cancelUniqueWork(IndexWorker.UNIQUE_WORK)
+            }
+        }
+
+        // Cloud ON without a stored key fails loudly at toggle time (names the
+        // missing key, toggle stays OFF). Cloud OFF purges transcript rows.
+        // Keystore/SQLite run on IO via openScope; toasts + state stay on Main.
+        fun keyMissing(load: () -> String?): Boolean = runCatching { load() }.getOrNull().isNullOrBlank()
+        fun setCloudStt(on: Boolean) {
+            if (on) {
+                openScope.launch {
+                    val missing = withContext(Dispatchers.IO) { keyMissing(voice::loadSttKey) }
+                    if (missing) {
+                        cloudKeyError = "Cloud transcription needs a key: save one under " +
+                            "\"${VoiceService.PREFS_NAME}\" -> \"${VoiceService.KEY_STT_API_KEY}\"."
+                        Toast.makeText(this@MainActivity, "Cloud STT needs a key — toggle left OFF", Toast.LENGTH_LONG).show()
+                        return@launch
+                    }
+                    cloudKeyError = null
+                    toggles = toggles.copy(cloudStt = true)
+                    settingsPrefs.edit().putBoolean(KEY_STT, true).apply()
+                }
+                return
+            }
+            cloudKeyError = null
+            toggles = toggles.copy(cloudStt = false)
+            settingsPrefs.edit().putBoolean(KEY_STT, false).apply()
+            openScope.launch {
+                withContext(Dispatchers.IO) { runCatching { searchStore.purgeTranscriptRows() } }
+            }
+        }
+        fun setCloudTts(on: Boolean) {
+            if (on) {
+                openScope.launch {
+                    val missing = withContext(Dispatchers.IO) { keyMissing(voice::loadTtsKey) }
+                    if (missing) {
+                        cloudKeyError = "Cloud read-aloud needs a key: save one under " +
+                            "\"${VoiceService.PREFS_NAME}\" -> \"${VoiceService.KEY_TTS_API_KEY}\"."
+                        Toast.makeText(this@MainActivity, "Cloud TTS needs a key — toggle left OFF", Toast.LENGTH_LONG).show()
+                        return@launch
+                    }
+                    cloudKeyError = null
+                    toggles = toggles.copy(cloudTts = true)
+                    settingsPrefs.edit().putBoolean(KEY_TTS, true).apply()
+                }
+                return
+            }
+            cloudKeyError = null
+            toggles = toggles.copy(cloudTts = false)
+            settingsPrefs.edit().putBoolean(KEY_TTS, false).apply()
+            openScope.launch {
+                withContext(Dispatchers.IO) { runCatching { searchStore.purgeTranscriptRows() } }
+            }
+        }
+
+        // Full wipe: cancel work, clear the index (transcript rows included),
+        // delete model packs, voice keys, and prefs. Loaded backends keep
+        // working until process death; a restart reports missing-model honestly.
+        fun wipeAll() {
+            WorkManager.getInstance(this).cancelUniqueWork(IndexWorker.UNIQUE_WORK)
+            openScope.launch {
+                withContext(Dispatchers.IO) {
+                    runCatching { searchStore.resetAll() }
+                    this@MainActivity.filesDir.listFiles { f -> f.extension == "litertlm" }
+                        ?.forEach { runCatching { it.delete() } }
+                    runCatching { voice.clearKeys() }
+                }
+            }
+            getSharedPreferences(PREFS_F022, MODE_PRIVATE).edit().clear().apply()
+            settingsPrefs.edit().clear().apply()
+            folders = emptyList()
+            toggles = VoiceService.defaultToggles()
+            cloudKeyError = null
+            userPaused = false
+            chargerOnly = false
+            wifiOnlyModels = true
+            indexDone = 0
+            indexTotal = 0
+            indexState = "not started"
+            Toast.makeText(this, "App data removed", Toast.LENGTH_SHORT).show()
+        }
+
+        val displayFolders =
+            folders.map {
+                runCatching { Uri.parse(it) }.getOrNull()?.lastPathSegment?.let(Uri::decode) ?: it
+            }
+        val validationErrors =
+            SettingsState(
+                folders, emptyList(), chargerOnly, wifiOnlyModels,
+                toggles.cloudStt, toggles.cloudTts,
+            ).validate(sttProvider = "google", ttsProvider = "google") + listOfNotNull(cloudKeyError)
+
         FileSearchApp(
+            tab = tab,
+            onTabChange = { tab = it },
             search = {
                 SearchScreen(
                     voice = voice,
@@ -286,7 +472,7 @@ class MainActivity : ComponentActivity() {
                     onToggleExpanded = { expanded = !expanded },
                     searching = searching,
                     onHeard = { query = it },
-                    onOpenResult = {}, // shortcut: no-op until result-open wiring lands.
+                    onOpenResult = { openResult(it) },
                 )
             },
             status = {
@@ -301,31 +487,35 @@ class MainActivity : ComponentActivity() {
                         remainingLabel = remainingLabel,
                         paused = paused,
                         pauseLabel = pauseLabel,
-                        onPauseToggle = { userPaused = !userPaused },
-                        onDismiss = {}, // shortcut: no-op until sheet-dismiss wiring lands.
+                        onPauseToggle = { togglePause() },
+                        onDismiss = { tab = 0 },
                     )
                 }
             },
             settings = {
                 SettingsScreenContent(
-                    folders = folders,
+                    folders = displayFolders,
                     excludedTypes = emptyList(),
                     chargerOnly = chargerOnly,
                     wifiOnlyModels = wifiOnlyModels,
                     toggles = toggles,
                     sttProviderLabel = "Google STT",
                     ttsProviderLabel = "Google TTS",
-                    // shortcut: live SettingsState.validate wiring is F023+ (engine is importable now).
-                    validationErrors = emptyList(),
+                    validationErrors = validationErrors,
                     wipeSummary = "Remove app data deletes downloaded models, the search index, " +
                         "logs, cloud transcripts, and stored voice keys.",
-                    onPickFolder = {}, // shortcut: no-op until SAF picker wiring lands.
-                    onChargerOnlyChange = { chargerOnly = it },
-                    onWifiOnlyChange = { wifiOnlyModels = it },
-                    onCloudSttChange = { toggles = toggles.copy(cloudStt = it) },
-                    onCloudTtsChange = { toggles = toggles.copy(cloudTts = it) },
-                    // shortcut: keys-only wipe for now — live index/model/log deletion lands with wiring.
-                    onWipe = { runCatching { voice.clearKeys() } },
+                    onPickFolder = { folderPicker.launch(null) },
+                    onChargerOnlyChange = {
+                        chargerOnly = it
+                        settingsPrefs.edit().putBoolean(KEY_CHARGER, it).apply()
+                    },
+                    onWifiOnlyChange = {
+                        wifiOnlyModels = it
+                        settingsPrefs.edit().putBoolean(KEY_WIFI, it).apply()
+                    },
+                    onCloudSttChange = { setCloudStt(it) },
+                    onCloudTtsChange = { setCloudTts(it) },
+                    onWipe = { wipeAll() },
                 )
             },
         )
@@ -335,5 +525,11 @@ class MainActivity : ComponentActivity() {
 // F022 constants: first-launch auto-start flag + first-corpus cap (Pictures only, newest first).
 private const val PREFS_F022 = "f022"
 private const val KEY_AUTOSTART_DONE = "autostart_done"
+private const val PREFS_SETTINGS = "settings"
+private const val KEY_FOLDERS = "folders"
+private const val KEY_CHARGER = "charger_only"
+private const val KEY_WIFI = "wifi_models"
+private const val KEY_STT = "cloud_stt"
+private const val KEY_TTS = "cloud_tts"
 private const val INDEX_NOW_CAP = 50
 private const val TAG = "MainActivity"

@@ -206,6 +206,34 @@ class DeviceIndexStore(ctx: Context) : AutoCloseable {
         return false
     }
 
+    /**
+     * Toggle-off purge (design §7 zero residue): deletes cloud transcript
+     * boost rows — extra kind=chunk segments + their FTS rows — and nothing
+     * else. Photo/screenshot segments stay.
+     *
+     * // shortcut: no origin column yet — doc chunks (F023+) must add one and
+     * // narrow this delete, or text-chunk ingestion will be purged as well.
+     */
+    @Synchronized
+    fun purgeTranscriptRows(): Int {
+        var deleted = 0
+        conn.prepare("SELECT COUNT(*) FROM segments WHERE kind='chunk'").use { q ->
+            q.step()
+            deleted = q.getLong(0).toInt()
+        }
+        if (deleted == 0) return 0
+        exec("BEGIN IMMEDIATE")
+        try {
+            exec("DELETE FROM fts WHERE rowid IN (SELECT id FROM segments WHERE kind='chunk')")
+            exec("DELETE FROM segments WHERE kind='chunk'")
+            exec("COMMIT")
+        } catch (t: Throwable) {
+            runCatching { exec("ROLLBACK") }
+            throw t
+        }
+        return deleted
+    }
+
     @Synchronized
     fun resetAll() {
         exec("BEGIN IMMEDIATE")

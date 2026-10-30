@@ -37,8 +37,8 @@ dev: ## install debug APK on attached device (adb) + launch
 	$(ADB) $$D install -r android/build/outputs/apk/debug/android-debug.apk && \
 	$(ADB) $$D shell am start -n $(APP_ID)/.MainActivity
 
-test: ## JVM unit tests (Linux-safe, CI gate)
-	$(GRADLE) :app:test --console=plain
+test: ## JVM unit tests (Linux-safe, CI gate: engine + android ActivityChrome/Paparazzi)
+	$(GRADLE) :app:test :android:testDebugUnitTest --console=plain
 
 test-device: ## instrumented tests on attached device/emulator (requires SDK)
 	@if ls android/src/androidTest -R 2>/dev/null | grep -q '\.kt$$'; then \

@@ -13,7 +13,8 @@
 
     <application
         android:label="FileSearch"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
         <!-- Needed for the LiteRT-LM GPU backend (OpenCL/VNDK libs). -->
         <uses-native-library android:name="libvndksupport.so" android:required="false" />
         <uses-native-library android:name="libOpenCL.so" android:required="false" />

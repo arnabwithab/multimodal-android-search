@@ -120,6 +120,7 @@ object DeviceSearch {
             excerpt = markExcerpt(text, findRanges(text, terms)),
             locLabel = formatLoc(kind, 0.0),
             thumbKey = "$kind:$id",
+            fileUri = path,
         )
     }
 

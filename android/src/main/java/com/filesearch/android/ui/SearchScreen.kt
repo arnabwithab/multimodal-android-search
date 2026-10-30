@@ -4,8 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -36,7 +35,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -49,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.filesearch.android.VoiceService
@@ -74,11 +73,18 @@ data class SearchRowUi(
     val excerpt: String,
     val locLabel: String,
     val thumbKey: String,
+    /** Indexed file URI (MediaStore content URI or file path) for thumbs/previews. */
+    val fileUri: String = "",
 )
 
 /**
  * Pure presentational search list (Paparazzi-safe: no permissions, no services).
  * [visibleRows] is engine-folded; [expanded] only flips the fold button label.
+ * Inline preview: tapping a thumbnail sets [expandedKey] to that row's
+ * thumbKey (stays in the Search tab — never navigates); audio rows play
+ * in-tab via [audioPlayingKey]/[audioIsPlaying]/[audioProgress] owned by the
+ * host. [pdfPreviews] injects PDF first-page state for snapshots; on device
+ * the row loads it from [SearchRowUi.fileUri].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,6 +101,13 @@ fun SearchScreenContent(
     onOpenResult: (SearchRowUi) -> Unit,
     modifier: Modifier = Modifier,
     searching: Boolean = false,
+    expandedKey: String? = null,
+    onPreviewToggle: (SearchRowUi) -> Unit = {},
+    audioPlayingKey: String? = null,
+    audioIsPlaying: Boolean = false,
+    audioProgress: Float = 0f,
+    onAudioToggle: (SearchRowUi) -> Unit = {},
+    pdfPreviews: Map<String, PdfPreviewData> = emptyMap(),
 ) {
     FileSearchTheme {
         var active by remember { mutableStateOf(false) }
@@ -191,6 +204,12 @@ fun SearchScreenContent(
                 itemsIndexed(visibleRows, key = { _, row -> row.thumbKey + row.fileName + row.locLabel + row.excerpt }) { i, row ->
                     ResultRow(
                         row = row,
+                        isExpanded = expandedKey == row.thumbKey,
+                        onThumbClick = { onPreviewToggle(row) },
+                        audioIsPlaying = audioPlayingKey == row.thumbKey && audioIsPlaying,
+                        audioProgress = if (audioPlayingKey == row.thumbKey) audioProgress else 0f,
+                        onAudioToggle = { onAudioToggle(row) },
+                        pdfPreview = pdfPreviews[row.thumbKey],
                         onSpeakClick = { onSpeakClick(row) },
                         onOpenResult = { onOpenResult(row) },
                         modifier = Modifier.testTag("row_$i"),
@@ -223,62 +242,87 @@ private fun ResultRow(
     onSpeakClick: () -> Unit,
     onOpenResult: () -> Unit,
     modifier: Modifier = Modifier,
+    isExpanded: Boolean = false,
+    onThumbClick: () -> Unit = {},
+    audioIsPlaying: Boolean = false,
+    audioProgress: Float = 0f,
+    onAudioToggle: () -> Unit = {},
+    pdfPreview: PdfPreviewData? = null,
 ) {
     // Stock Card defaults: M3 picks container/shape, content color inherited.
     Card(modifier = modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(12.dp),
-        ) {
-            // Thumb tile: stock circle in tonal container, keyed by kind.
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.size(56.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        row.kind.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
-            }
-            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(
-                    row.fileName,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+        // Sampled thumb loaded once per row (device decodes off-Main in the
+        // loader; Paparazzi/inspection returns null -> letter tile). The PDF
+        // first page loads unconditionally (hook-stability: never call a
+        // remember/LaunchedEffect composable from a conditional branch); the
+        // injected snapshot [pdfPreview] still wins when present.
+        val loadedThumb = rememberImageThumb(row.fileUri)
+        val loadedPdf = rememberPdfFirstPage(row.fileUri)
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Thumb tile: real sampled bitmap on device, letter tile while
+                // loading/on failure (BitmapFactory sampling — no new dep).
+                // Tapping expands the row inline; never navigates.
+                ThumbTile(
+                    kind = row.kind,
+                    thumb = loadedThumb,
+                    contentDescription = row.fileName,
+                    modifier = Modifier.testTag("thumb_${row.thumbKey}").clickable(role = Role.Button, onClick = onThumbClick),
                 )
-                // One meta line (kind + location) instead of two custom pills.
-                val meta =
-                    listOf(row.kind, row.locLabel).filter { it.isNotEmpty() }.joinToString(" • ")
-                if (meta.isNotEmpty()) {
+                Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text(
-                        meta,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        row.fileName,
+                        style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    // One meta line (kind + location) instead of two custom pills.
+                    val meta =
+                        listOf(row.kind, row.locLabel).filter { it.isNotEmpty() }.joinToString(" • ")
+                    if (meta.isNotEmpty()) {
+                        Text(
+                            meta,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    // Engine-marked «match» excerpt, shown verbatim.
+                    Text(
+                        row.excerpt,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
-                // Engine-marked «match» excerpt, shown verbatim.
-                Text(
-                    row.excerpt,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
+                Column {
+                    IconButton(onClick = onSpeakClick) {
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Read excerpt aloud")
+                    }
+                    IconButton(onClick = onOpenResult) {
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open result")
+                    }
+                }
             }
-            Column {
-                IconButton(onClick = onSpeakClick) {
-                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Read excerpt aloud")
-                }
-                IconButton(onClick = onOpenResult) {
-                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open result")
-                }
+            // Inline expansion: preview lives inside the row, in the Search tab.
+            if (isExpanded) {
+                val pdf = pdfPreview ?: loadedPdf
+                MediaPreview(
+                    row = row,
+                    imageThumb =
+                        if (row.kind == "image" || row.kind == "video") {
+                            loadedThumb
+                        } else {
+                            null
+                        },
+                    pdf = pdf,
+                    audioIsPlaying = audioIsPlaying,
+                    audioProgress = audioProgress,
+                    onAudioToggle = onAudioToggle,
+                    modifier = Modifier.testTag("preview_${row.thumbKey}"),
+                )
             }
         }
     }
@@ -302,6 +346,12 @@ fun SearchScreen(
     onOpenResult: (SearchRowUi) -> Unit,
     modifier: Modifier = Modifier,
     searching: Boolean = false,
+    expandedKey: String? = null,
+    onPreviewToggle: (SearchRowUi) -> Unit = {},
+    audioPlayingKey: String? = null,
+    audioIsPlaying: Boolean = false,
+    audioProgress: Float = 0f,
+    onAudioToggle: (SearchRowUi) -> Unit = {},
 ) {
     val context = LocalContext.current
     var listening by remember { mutableStateOf(false) }
@@ -341,5 +391,11 @@ fun SearchScreen(
         onOpenResult = onOpenResult,
         searching = searching,
         modifier = modifier,
+        expandedKey = expandedKey,
+        onPreviewToggle = onPreviewToggle,
+        audioPlayingKey = audioPlayingKey,
+        audioIsPlaying = audioIsPlaying,
+        audioProgress = audioProgress,
+        onAudioToggle = onAudioToggle,
     )
 }

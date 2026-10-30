@@ -29,19 +29,26 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import com.filesearch.android.app.formatRemaining
 import com.filesearch.android.app.SettingsState
 import com.filesearch.android.engine.Embedder
 import com.filesearch.android.ui.FileSearchApp
 import com.filesearch.android.ui.KindProgress
 import com.filesearch.android.ui.SearchRowUi
+import com.filesearch.android.ui.progressFraction
 import com.filesearch.android.ui.SearchScreen
 import com.filesearch.android.ui.SettingsScreenContent
 import com.filesearch.android.ui.StatusSheetContent
@@ -202,6 +209,80 @@ class MainActivity : ComponentActivity() {
             onDispose {
                 runCatching { searchStore.close() }
                 runCatching { searchBackend.close() }
+            }
+        }
+        // Inline preview state: expanded row key (tap thumb toggles, stays in
+        // the Search tab) + single in-tab audio player. One ExoPlayer: starting
+        // another row stops the current one; release on dispose — no
+        // background playback, in-tab only.
+        var previewKey by remember { mutableStateOf<String?>(null) }
+        var audioKey by remember { mutableStateOf<String?>(null) }
+        var audioPlaying by remember { mutableStateOf(false) }
+        var audioProgress by remember { mutableStateOf(0f) }
+        val player =
+            remember {
+                ExoPlayer.Builder(this).build().apply {
+                    addListener(
+                        object : Player.Listener {
+                            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                                audioPlaying = isPlaying
+                            }
+
+                            override fun onPlaybackStateChanged(state: Int) {
+                                if (state == Player.STATE_ENDED) {
+                                    audioKey = null
+                                    audioProgress = 0f
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+        DisposableEffect(player) {
+            onDispose { runCatching { player.release() } }
+        }
+        // In-tab audio only: leaving the Search tab pauses (never background
+        // playback); backgrounding the app pauses via the onStop observer.
+        DisposableEffect(tab) {
+            onDispose { runCatching { player.pause() } }
+        }
+        val appLifecycle = LocalLifecycleOwner.current.lifecycle
+        DisposableEffect(appLifecycle, player) {
+            val observer =
+                LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_STOP) runCatching { player.pause() }
+                }
+            appLifecycle.addObserver(observer)
+            onDispose { appLifecycle.removeObserver(observer) }
+        }
+        // Progress poll while playing (Main; player reads are cheap getters).
+        LaunchedEffect(audioKey, audioPlaying) {
+            while (audioPlaying) {
+                val dur = player.duration.coerceAtLeast(0L)
+                audioProgress = progressFraction(player.currentPosition, dur)
+                delay(500)
+            }
+        }
+        fun toggleAudio(row: SearchRowUi) {
+            // Same row paused: resume from position, don't restart from zero.
+            if (audioKey == row.thumbKey) {
+                if (player.isPlaying) player.pause() else player.play()
+                return
+            }
+            if (row.fileUri.isBlank()) {
+                Toast.makeText(this@MainActivity, "No audio to play", Toast.LENGTH_SHORT).show()
+                return
+            }
+            runCatching {
+                player.stop()
+                player.clearMediaItems()
+                player.setMediaItem(MediaItem.fromUri(Uri.parse(row.fileUri)))
+                player.prepare()
+                player.play()
+                audioKey = row.thumbKey
+                audioProgress = 0f
+            }.onFailure {
+                Toast.makeText(this@MainActivity, "Can't play this audio", Toast.LENGTH_SHORT).show()
             }
         }
         // Debounced query path (typing + voice onHeard both land in query).
@@ -473,6 +554,12 @@ class MainActivity : ComponentActivity() {
                     searching = searching,
                     onHeard = { query = it },
                     onOpenResult = { openResult(it) },
+                    expandedKey = previewKey,
+                    onPreviewToggle = { previewKey = if (previewKey == it.thumbKey) null else it.thumbKey },
+                    audioPlayingKey = audioKey,
+                    audioIsPlaying = audioPlaying,
+                    audioProgress = audioProgress,
+                    onAudioToggle = { toggleAudio(it) },
                 )
             },
             status = {

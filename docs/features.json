@@ -451,7 +451,7 @@
           "status": "planned"
         }
       ],
-      "notes": "Includes the 5-step manual mic pass from docs/bench/sm8635-voice.md (speak 3 queries incl. non-English, speaker playback, airplane fallback) once the search UI exists. UI simplification: Scaffold+TopAppBar pinned headings (fixes black-on-dark), stock M3 roles, dark coherent, 13 snapshots.",
+      "notes": "Includes the 5-step manual mic pass from docs/bench/sm8635-voice.md (speak 3 queries incl. non-English, speaker playback, airplane fallback) once the search UI exists. UI simplification: Scaffold+TopAppBar pinned headings (fixes black-on-dark), stock M3 roles, dark coherent, 13 snapshots. Media rows: sampled image/video thumbs (BitmapFactory, off-Main), PDF first-page text-or-render preview (axet pdfium promoted to implementation), inline audio play/pause + progress via one in-tab ExoPlayer (no background playback); tap-thumb expands inline, stays in Search tab; hook-safe loaders (Paparazzi-deterministic), reviewed BLOCKED then fixed, re-reviewed PASS.",
       "added": "2026-10-30",
       "completed": "2026-10-30"
     },

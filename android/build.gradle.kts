@@ -69,10 +69,15 @@ dependencies {
     implementation("androidx.sqlite:sqlite-bundled:2.7.1")
     // F017 extraction parity (device-only; engine untouched):
     // axet fork exposes FPDFText (page text layer); barteksc/mhiew are render-only.
-    androidTestImplementation("com.github.axet:pdfium:2.0.16")
+    // Promoted to implementation for inline PDF first-page preview (MediaPreview);
+    // same artifact the review flagged "promote back when production lands".
+    implementation("com.github.axet:pdfium:2.0.16")
     androidTestImplementation("com.google.mlkit:text-recognition:16.0.1") // Latin OCR, bundled model
     androidTestImplementation("androidx.media3:media3-transformer:1.4.1")
     androidTestImplementation("androidx.media3:media3-extractor:1.4.1")
+    // Inline audio preview (MediaPreview + MainActivity player): in-tab only,
+    // no background playback. Pinned to the same 1.4.1 as transformer/extractor.
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
     // Promote back to implementation when production extraction lands.
     androidTestImplementation("androidx.test:core:1.6.1")
     // F020 Compose UI binding (BOM only; text buttons, no icons lib).

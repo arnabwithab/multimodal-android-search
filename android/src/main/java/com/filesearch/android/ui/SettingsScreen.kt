@@ -2,13 +2,27 @@ package com.filesearch.android.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,64 +60,149 @@ fun SettingsScreenContent(
     onWipe: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)
-                .testTag("settingsScreen"),
-    ) {
-        Section("Folders to watch") {
-            folders.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
-            Button(onClick = onPickFolder, modifier = Modifier.padding(top = 4.dp)) { Text("Add folder") }
-        }
-        Section("Excluded types") {
-            Text(excludedTypes.joinToString(", ").ifEmpty { "none" })
-        }
-        Section("Battery rule") {
-            ToggleRow("Index on charger only", chargerOnly, onChargerOnlyChange, tag = "chargerSwitch")
-            ToggleRow("Download models over Wi-Fi only", wifiOnlyModels, onWifiOnlyChange, tag = "wifiSwitch")
-        }
-        Section("Voice") {
-            ToggleRow(
-                "Cloud transcription ($sttProviderLabel)",
-                toggles.cloudStt,
-                onCloudSttChange,
-                tag = "cloudSttSwitch",
-            )
-            ToggleRow(
-                "Cloud read-aloud ($ttsProviderLabel)",
-                toggles.cloudTts,
-                onCloudTtsChange,
-                tag = "cloudTtsSwitch",
-            )
-            Text(
-                "Off by default. On-device speech is free and offline; cloud sends audio " +
-                    "to the named provider using your key, billed per minute.",
-                style = MaterialTheme.typography.labelSmall,
-            )
-        }
-        Section("Models") {
-            Text("Packs download once over Wi-Fi, checksum-verified, deletable.")
-        }
-        Section("Remove app data") {
-            Text(wipeSummary, style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = onWipe, modifier = Modifier.padding(top = 4.dp).testTag("wipeButton")) {
-                Text("Remove app data")
+    FileSearchTheme {
+        Column(
+            modifier =
+                modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)
+                    .testTag("settingsScreen"),
+        ) {
+            Text("Settings", style = MaterialTheme.typography.headlineSmall)
+            if (validationErrors.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("validationErrors"),
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                        validationErrors.forEach { error ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(vertical = 2.dp),
+                            ) {
+                                Icon(
+                                    Icons.Filled.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    error,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            Section("Folders") {
+                if (folders.isEmpty()) {
+                    Text(
+                        "No folders yet — add one to start indexing.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                folders.forEach {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(it, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                OutlinedButton(
+                    onClick = onPickFolder,
+                    modifier = Modifier.padding(top = 8.dp).testTag("addFolderButton"),
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add folder")
+                }
+                Text(
+                    "Skipped types: " + excludedTypes.joinToString(", ").ifEmpty { "none" },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            Section("Battery") {
+                ToggleRow("Index on charger only", chargerOnly, onChargerOnlyChange, tag = "chargerSwitch")
+                ToggleRow("Download models over Wi-Fi only", wifiOnlyModels, onWifiOnlyChange, tag = "wifiSwitch")
+            }
+            Section("Voice") {
+                ToggleRow(
+                    "Cloud transcription ($sttProviderLabel)",
+                    toggles.cloudStt,
+                    onCloudSttChange,
+                    tag = "cloudSttSwitch",
+                )
+                ToggleRow(
+                    "Cloud read-aloud ($ttsProviderLabel)",
+                    toggles.cloudTts,
+                    onCloudTtsChange,
+                    tag = "cloudTtsSwitch",
+                )
+                Text(
+                    "Off by default. On-device speech is free and offline; cloud sends audio " +
+                        "to the named provider using your key, billed per minute.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            Section("Models") {
+                Text(
+                    "Packs download once over Wi-Fi, checksum-verified, deletable.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Section("Data") {
+                Text(wipeSummary, style = MaterialTheme.typography.bodyMedium)
+                Button(
+                    onClick = onWipe,
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError,
+                        ),
+                    modifier = Modifier.padding(top = 8.dp).testTag("wipeButton"),
+                ) {
+                    Icon(Icons.Filled.Delete, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Remove app data")
+                }
             }
         }
-        validationErrors.forEach { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
 
 @Composable
 private fun Section(title: String, body: @Composable () -> Unit) {
-    Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp))
-    body()
+    Card(
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(top = 8.dp)) { body() }
+        }
+    }
 }
 
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, tag: String) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text(label, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onChange, modifier = Modifier.testTag(tag))
     }
 }

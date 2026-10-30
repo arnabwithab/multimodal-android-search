@@ -86,6 +86,42 @@ class SearchUiNightPaparazziTest {
     }
 
     @Test
+    fun searchListening() {
+        paparazzi.snapshot {
+            SearchScreenContent(
+                query = "sleep",
+                onQueryChange = {},
+                visibleRows = listOf(PaparazziFixtures.strong, PaparazziFixtures.audio),
+                weakCount = 0,
+                expanded = false,
+                onToggleExpanded = {},
+                listening = true,
+                onMicClick = {},
+                onSpeakClick = {},
+                onOpenResult = {},
+            )
+        }
+    }
+
+    @Test
+    fun searchEmpty() {
+        paparazzi.snapshot {
+            SearchScreenContent(
+                query = "zzz",
+                onQueryChange = {},
+                visibleRows = emptyList(),
+                weakCount = 0,
+                expanded = false,
+                onToggleExpanded = {},
+                listening = false,
+                onMicClick = {},
+                onSpeakClick = {},
+                onOpenResult = {},
+            )
+        }
+    }
+
+    @Test
     fun statusSheetPaused() {
         paparazzi.snapshot {
             StatusSheetContent(

@@ -263,7 +263,7 @@
         "notes": "35 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; Compose binding + Paparazzi on device"
       },
       "subtasks": [],
-      "notes": "",
+      "notes": "UI polish: mic icon button, SearchBar, dark mode via FileSearchTheme; 13/13 Paparazzi snapshots green (day+night). Reviewed PASS, P2s fixed and re-verified.",
       "added": "2026-10-14",
       "completed": "2026-10-15"
     },

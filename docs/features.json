@@ -3,9 +3,9 @@
   "last_updated": "2026-10-30",
   "summary": {
     "total": 20,
-    "completed": 18,
+    "completed": 19,
     "in_progress": 0,
-    "planned": 2,
+    "planned": 1,
     "tests_passing": 255,
     "tests_failing": 0,
     "tests_missing": 3

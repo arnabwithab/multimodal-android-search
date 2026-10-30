@@ -3,9 +3,9 @@
   "last_updated": "2026-10-30",
   "summary": {
     "total": 20,
-    "completed": 19,
+    "completed": 20,
     "in_progress": 0,
-    "planned": 1,
+    "planned": 0,
     "tests_passing": 255,
     "tests_failing": 0,
     "tests_missing": 3
@@ -431,16 +431,18 @@
       "id": "F020",
       "name": "Compose UI binding",
       "description": "SearchScreen + StatusSheet + Settings bound to UiState (engine logic stays in app/ module), Paparazzi snapshots, thumb-test on phone.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "android/src/main/java/com/filesearch/android",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
-          "android/src/androidTest/java/com/filesearch/android/SearchUiTest.kt"
+          "android/src/androidTest/java/com/filesearch/android/SearchUiTest.kt",
+          "android/src/test/java/com/filesearch/android/SearchUiPaparazziTest.kt",
+          "android/src/test/java/com/filesearch/android/SearchUiNightPaparazziTest.kt"
         ],
-        "notes": ""
+        "notes": "9/9 Paparazzi snapshots PASS via :android:testDebugUnitTest (5 light + 4 night); SearchUiTest instrumented skeleton phone-only via make test-device; make test + make style green"
       },
       "subtasks": [
         {
@@ -451,7 +453,7 @@
       ],
       "notes": "Includes the 5-step manual mic pass from docs/bench/sm8635-voice.md (speak 3 queries incl. non-English, speaker playback, airplane fallback) once the search UI exists.",
       "added": "2026-10-30",
-      "completed": null
+      "completed": "2026-10-30"
     }
   ]
 }

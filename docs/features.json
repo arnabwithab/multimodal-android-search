@@ -2,13 +2,13 @@
   "project": "multimodal-search-for-android",
   "last_updated": "2026-10-30",
   "summary": {
-    "total": 16,
-    "completed": 16,
+    "total": 20,
+    "completed": 17,
     "in_progress": 0,
-    "planned": 0,
+    "planned": 3,
     "tests_passing": 255,
     "tests_failing": 0,
-    "tests_missing": 0
+    "tests_missing": 3
   },
   "features": [
     {
@@ -167,7 +167,7 @@
         "files": [
           "app/src/test/java/com/filesearch/android/engine/IndexStoreTest.kt"
         ],
-        "notes": "14 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; exact arch §5 FTS5 tokenizer verified on bundled SQLite"
+        "notes": "14 tests green via make test; greptile-reviewed, fixes re-reviewed PASS; exact arch \u00a75 FTS5 tokenizer verified on bundled SQLite"
       },
       "subtasks": [],
       "notes": "",
@@ -177,7 +177,7 @@
     {
       "id": "F008",
       "name": "Searcher fusion",
-      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, ≥6 scripts in evals.",
+      "description": "Brute-force cosine + per-modality z-gate + FTS OR + fusion + strongCount. Script-agnostic, \u22656 scripts in evals.",
       "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/filesearch/android/engine",
@@ -192,7 +192,7 @@
         "notes": "26 tests green via make test (Vectors 7, SearchText 9, Searcher 10); greptile-reviewed, fixes re-reviewed PASS; eval R@1 gate waits on F013 Embedder"
       },
       "subtasks": [],
-      "notes": "eval bundle: EvalRunner + paraphrase corpus + parity probe (meaning-only R@1 harness, real-weights gate pending); R@1 0.50 / R@3 0.67 meaning-only on real 300m weights — FTS backup mandatory, vectors are recall contributors",
+      "notes": "eval bundle: EvalRunner + paraphrase corpus + parity probe (meaning-only R@1 harness, real-weights gate pending); R@1 0.50 / R@3 0.67 meaning-only on real 300m weights \u2014 FTS backup mandatory, vectors are recall contributors",
       "added": "2026-10-14",
       "completed": "2026-10-15"
     },
@@ -270,7 +270,7 @@
     {
       "id": "F012",
       "name": "Model manager + SoC picker",
-      "description": "Staged download (270M→440M→740M), per-SoC AOT select, SHA verify, reference-vector gate.",
+      "description": "Staged download (270M\u2192440M\u2192740M), per-SoC AOT select, SHA verify, reference-vector gate.",
       "status": "completed",
       "priority": "high",
       "module": "app/src/main/java/com/filesearch/android/engine",
@@ -303,7 +303,7 @@
         "notes": "7 tests green via make test; greptile-reviewed, re-reviewed PASS; reference-vector gate needs real .litertlm; eval R@1 SKIP until runner lands"
       },
       "subtasks": [],
-      "notes": "eval bundle: EvalRunner + paraphrase corpus + parity probe (meaning-only R@1 harness, real-weights gate pending); R@1 0.50 / R@3 0.67 meaning-only on real 300m weights — FTS backup mandatory, vectors are recall contributors",
+      "notes": "eval bundle: EvalRunner + paraphrase corpus + parity probe (meaning-only R@1 harness, real-weights gate pending); R@1 0.50 / R@3 0.67 meaning-only on real 300m weights \u2014 FTS backup mandatory, vectors are recall contributors",
       "added": "2026-10-15",
       "completed": "2026-10-15"
     },
@@ -340,7 +340,7 @@
         "files": [
           "docs/bench/sm8635-generic.md"
         ],
-        "notes": "Device-only smoke test (no JVM unit test possible — needs LiteRT-LM + NPU); verified by the on-device run itself: NPU accepted, init 9718ms, infer 211ms, RSS 739MB. Rerun via make bench-device."
+        "notes": "Device-only smoke test (no JVM unit test possible \u2014 needs LiteRT-LM + NPU); verified by the on-device run itself: NPU accepted, init 9718ms, infer 211ms, RSS 739MB. Rerun via make bench-device."
       },
       "subtasks": [],
       "notes": "NPU accepted generic pack first try; GPU/CPU not probed. MemAvailable ~2.0GB at run; re-run may need freed memory on a fuller phone.",
@@ -360,12 +360,98 @@
         "files": [
           "docs/bench/sm8635-full.md"
         ],
-        "notes": "Device-only (needs LiteRT-LM + phone); verified by the on-device run itself: NPU rejected (audio executor), GPU accepted all three — text 58ms, image 932ms, audio 3525ms, RSS 361MB. Rerun via make bench-device."
+        "notes": "Device-only (needs LiteRT-LM + phone); verified by the on-device run itself: NPU rejected (audio executor), GPU accepted all three \u2014 text 58ms, image 932ms, audio 3525ms, RSS 361MB. Rerun via make bench-device."
       },
       "subtasks": [],
-      "notes": "GO (GPU). NPU rejection is a recorded negative result — one engine serves all three encoders so init fails as a unit. 255 JVM tests still green.",
+      "notes": "GO (GPU). NPU rejection is a recorded negative result \u2014 one engine serves all three encoders so init fails as a unit. 255 JVM tests still green.",
       "added": "2026-10-30",
       "completed": "2026-10-30"
+    },
+    {
+      "id": "F017",
+      "name": "Extraction parity on device",
+      "description": "PdfiumAndroid vs desktop render/text parity, ImageDecoder HEIC decode, ML Kit OCR gap check (incl. Bengali vowel-sign order), Media3 PCM level check for the -50dB gate, MMR frame accuracy + MTS 12s seek-back.",
+      "status": "planned",
+      "priority": "high",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": [
+          "android/src/androidTest/java/com/filesearch/android/ExtractionParityTest.kt"
+        ],
+        "notes": ""
+      },
+      "subtasks": [],
+      "notes": "needs phone + 740M model on device",
+      "added": "2026-10-30",
+      "completed": null
+    },
+    {
+      "id": "F018",
+      "name": "Background field test",
+      "description": "WorkManager expedited worker + MediaStore observer + Doze/thermal guards + 500-file Downloads crawl (drain/time/pause/resume/charger-only).",
+      "status": "completed",
+      "priority": "high",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "passing",
+        "files": [
+          "android/src/androidTest/java/com/filesearch/android/BackgroundFieldTest.kt"
+        ],
+        "notes": "5/5 instrumented tests PASS on Realme GT 6 (SM8635): 500-file crawl 925ms / 540 files/s, pause/watchdog/backoff/observer covered. Bench: docs/bench/sm8635-field.md."
+      },
+      "subtasks": [],
+      "notes": "10/10 device tests pass (5 BackgroundFieldTest + 5 VoiceE2ETest). 500 fixtures: 925ms, 540 files/s. Bench: docs/bench/sm8635-field.md",
+      "added": "2026-10-30",
+      "completed": "2026-10-30"
+    },
+    {
+      "id": "F019",
+      "name": "Voice E2E on device",
+      "description": "Mic->STT->results->TTS path, on-device + cloud toggle, EncryptedSharedPreferences keys, airplane-mode fallback, cost meter.",
+      "status": "completed",
+      "priority": "high",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "passing",
+        "files": [
+          "android/src/androidTest/java/com/filesearch/android/VoiceE2ETest.kt"
+        ],
+        "notes": "5 instrumented tests PASS on Realme GT 6 (also re-run with airplane mode on, then restored): toggles OFF, key round-trip, cloud-without-key names prefs key, fallback returns typed query, TTS speak-to-done fires. Mic-live not asserted \u2014 manual mic checklist moved to F020 (needs search UI with mic button)."
+      },
+      "subtasks": [],
+      "notes": "VoiceService owns STT listen/stop + transcript handoff, TTS speak/done, EncryptedSharedPreferences keys, cloud key-required errors, CostMeter tally, offline fallback. No audio recorded, no keys logged.",
+      "added": "2026-10-30",
+      "completed": "2026-10-30"
+    },
+    {
+      "id": "F020",
+      "name": "Compose UI binding",
+      "description": "SearchScreen + StatusSheet + Settings bound to UiState (engine logic stays in app/ module), Paparazzi snapshots, thumb-test on phone.",
+      "status": "planned",
+      "priority": "high",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": [
+          "android/src/androidTest/java/com/filesearch/android/SearchUiTest.kt"
+        ],
+        "notes": ""
+      },
+      "subtasks": [
+        {
+          "id": "F020-1",
+          "name": "Manual mic checklist on device",
+          "status": "planned"
+        }
+      ],
+      "notes": "Includes the 5-step manual mic pass from docs/bench/sm8635-voice.md (speak 3 queries incl. non-English, speaker playback, airplane fallback) once the search UI exists.",
+      "added": "2026-10-30",
+      "completed": null
     }
   ]
 }

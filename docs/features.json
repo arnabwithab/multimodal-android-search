@@ -3,12 +3,12 @@
   "last_updated": "2026-10-30",
   "summary": {
     "total": 21,
-    "completed": 20,
+    "completed": 21,
     "in_progress": 0,
-    "planned": 1,
-    "tests_passing": 255,
+    "planned": 0,
+    "tests_passing": 259,
     "tests_failing": 0,
-    "tests_missing": 3
+    "tests_missing": 2
   },
   "features": [
     {
@@ -459,21 +459,22 @@
       "id": "F021",
       "name": "HEIC fallback when no decoder",
       "description": "Fallback for devices whose ImageDecoder has no HEIC codec (SM8635 recorded in F017): skip-with-reason vs transcode so HEIC files are not silently missed.",
-      "status": "planned",
+      "status": "completed",
       "priority": "medium",
       "module": "android/src/main/java/com/filesearch/android",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
-          "android/src/test/java/com/filesearch/android/HeicFallbackTest.kt"
+          "app/src/test/java/com/filesearch/android/engine/PrepareTest.kt",
+          "android/src/androidTest/java/com/filesearch/android/HeicFallbackTest.kt"
         ],
-        "notes": ""
+        "notes": "4 new JVM tests green (259 total via make test); HeicFallbackTest 1/1 PASS on SM8635 (Realme GT 6); SearchUiTest 3/3 PASS same run; make style green"
       },
       "subtasks": [],
-      "notes": "SM8635 has no HEIC decoder (F017 RECORDED) — ImagePrepare assumes ImageDecoder handles HEIC and silently misses files. Needs phone to verify fallback (skip-with-reason vs transcode). No phone attached now — do NOT implement, register only.",
+      "notes": "Probe corrected F017: MediaCodecList still-mime query is null (encoder only) BUT ImageDecoder decodes sample.heic to 1280x854 via the software HEVC decoder (c2.android.hevc.decoder) — so HeicSupport probes still-mime OR video/hevc (present=true here, no skips on this phone). Engine plan() gained heicDecoderPresent (default true, so other phones never newly skip); false + HEIC -> skipped:no-heic-decoder. F020-1 manual mic checklist still planned for the human.",
       "added": "2026-10-30",
-      "completed": null
+      "completed": "2026-10-30"
     }
   ]
 }

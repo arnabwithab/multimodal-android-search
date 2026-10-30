@@ -58,6 +58,39 @@ class PrepareTest {
     }
 
     @Test
+    fun `HEIC without a decoder is skipped with an explicit reason`() {
+        // SM8635 (F017 RECORDED): MediaCodecList has a HEIC encoder only, no decoder.
+        for (format in listOf("heic", "heif", "HEIC", ".Heic", "image/heic", "image/heif", "image/vnd.android.heic")) {
+            assertEquals("skipped:no-heic-decoder", plan(4000, 3000, false, format, heicDecoderPresent = false).skipReason, format)
+        }
+        // Screenshots follow the same rule (1536px base kept, skip reason attached).
+        assertEquals("skipped:no-heic-decoder", plan(1170, 2532, true, "heic", heicDecoderPresent = false).skipReason)
+    }
+
+    @Test
+    fun `HEIC with a decoder keeps its vector`() {
+        assertNull(plan(4000, 3000, false, "heic", heicDecoderPresent = true).skipReason)
+        assertNull(plan(4000, 3000, false, "heif", heicDecoderPresent = true).skipReason)
+    }
+
+    @Test
+    fun `missing decoder changes nothing for non-HEIC`() {
+        assertNull(plan(4000, 3000, false, "jpg", heicDecoderPresent = false).skipReason)
+        assertNull(plan(4000, 3000, false, "png", heicDecoderPresent = false).skipReason)
+        assertEquals("skipped:raw-v1", plan(4000, 3000, false, "dng", heicDecoderPresent = false).skipReason)
+    }
+
+    @Test
+    fun `isHeicFormat matches ext and MIME spellings`() {
+        for (format in listOf("heic", "heif", "HEIC", ".heic", "IMG.HEIF", "image/heic", "image/heif", "image/vnd.android.heic")) {
+            assertTrue(isHeicFormat(format), format)
+        }
+        for (format in listOf("jpg", "png", "avif", "webp", "dng", "image/jpeg")) {
+            assertTrue(!isHeicFormat(format), format)
+        }
+    }
+
+    @Test
     fun `screenshot detected by filename prefix`() {
         assertTrue(isScreenshot("/sdcard/DCIM/Screenshot_20240101-120000.png", null))
         assertTrue(isScreenshot("/sdcard/DCIM/screenshot_01.jpg", null))

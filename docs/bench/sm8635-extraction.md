@@ -52,6 +52,15 @@ heic verdict=RECORDED-skip reason=no-heic-decoder
 
 ## Follow-ups (not this feature)
 
+- F021 correction (2026-10-30): the "no HEIC decoder" row above was a
+  MediaCodecList still-mime query only (`findDecoderForFormat` is null, encoder
+  exists). Re-probed via ImageDecoder: the same `sample.heic` decodes to a
+  1280x854 bitmap, through the software HEVC decoder (`c2.android.hevc.decoder`
+  — `.heic` stills are HEVC-coded). `HeicSupport.hasHeicDecoder()` therefore
+  probes still-mime OR `video/hevc` (both logged by `HeicFallbackTest`,
+  verdict PASS on this phone), and engine `plan()` skips HEIC with
+  `skipped:no-heic-decoder` only where neither exists. No app-side HEIC decoder
+  needed on SM8635.
 - Bengali OCR stays a known gap: either accept image-vector-only for Bengali
   script (current design already does) or evaluate a Bengali-capable OCR
   backend later. Vowel-sign order specifically untestable until a recognizer

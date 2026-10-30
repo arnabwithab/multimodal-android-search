@@ -14,15 +14,27 @@ data class ImagePlan(
 private val RAW_FORMATS = setOf("arw", "cr2", "cr3", "nef", "dng", "rw2", "orf", "raf", "pef", "srw")
 private val RAW_MIME_HINTS = listOf("adobe-dng", "/arw", "/x-sony-arw", "/x-olympus-orf", "/x-fuji-raf", "/x-panasonic-rw2")
 
+/** HEIC stills need an on-device decoder (SM8635 firmware ships an encoder only — F021). */
+fun isHeicFormat(format: String): Boolean {
+    val norm = format.lowercase(java.util.Locale.ROOT)
+    val ext = norm.substringAfterLast(".")
+    return ext == "heic" || ext == "heif" ||
+        norm == "image/heic" || norm == "image/heif" ||
+        norm == "image/vnd.android.heic"
+}
+
 /** Smallest longest-side that still counts as content; below this in both dims the image is an icon. */
 private const val ICON_LONGEST_PX = 256
 
-/** Size + skip rules. HEIC is NOT skipped (decoded on-device via ImageDecoder). */
+/** Size + skip rules. HEIC decodes via ImageDecoder where the firmware ships a decoder;
+ * without one ([heicDecoderPresent] false) it is skipped with an explicit reason
+ * instead of silently missed. Defaults to present so decoder-less phones opt in explicitly. */
 fun plan(
     width: Int,
     height: Int,
     isScreenshot: Boolean,
     format: String,
+    heicDecoderPresent: Boolean = true,
 ): ImagePlan {
     val kind = if (isScreenshot) ImageKind.SCREENSHOT else ImageKind.PHOTO
     val base =
@@ -38,6 +50,7 @@ fun plan(
             // Icons are small in both dims; a wide banner (1920x100) is real content, not an icon.
             maxOf(width, height) < ICON_LONGEST_PX -> "skipped:icon"
             ext in RAW_FORMATS || RAW_MIME_HINTS.any { it in norm } -> "skipped:raw-v1"
+            isHeicFormat(format) && !heicDecoderPresent -> "skipped:no-heic-decoder"
             else -> null
         }
     return if (skipReason == null) base else base.copy(skipReason = skipReason)

@@ -2,3 +2,5 @@ build/
 app/build/
 .gradle/
 __pycache__/
+docs/bench/last-*.json
+.kotlin/

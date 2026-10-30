@@ -32,9 +32,16 @@ class MainActivity : Activity() {
             }
             runOnUiThread {
                 view.text = if (result != null) {
-                    "backend=${result.optString("backend")} " +
-                        "init=${result.optLong("initMs")}ms " +
-                        "infer=${result.optLong("inferMs", -1)}ms " +
+                    val mods = result.optJSONObject("modalities")
+                    fun short(m: String): String {
+                        val o = mods?.optJSONObject(m) ?: return "$m=?"
+                        return if (o.optBoolean("ok")) {
+                            "$m=${o.optString("backend")}/${o.optLong("inferMs")}ms"
+                        } else {
+                            "$m=FAIL"
+                        }
+                    }
+                    "text: ${short("text")} image: ${short("image")} audio: ${short("audio")} " +
                         "rss=${result.optLong("rssKb")}kB"
                 } else {
                     "Benchmark FAILED (see logcat)"

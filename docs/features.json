@@ -1,9 +1,9 @@
 {
   "project": "multimodal-search-for-android",
-  "last_updated": "2026-10-15",
+  "last_updated": "2026-10-30",
   "summary": {
-    "total": 15,
-    "completed": 15,
+    "total": 16,
+    "completed": 16,
     "in_progress": 0,
     "planned": 0,
     "tests_passing": 255,
@@ -346,6 +346,26 @@
       "notes": "NPU accepted generic pack first try; GPU/CPU not probed. MemAvailable ~2.0GB at run; re-run may need freed memory on a fuller phone.",
       "added": "2026-10-18",
       "completed": "2026-10-18"
+    },
+    {
+      "id": "F016",
+      "name": "Full-modality benchmark (SM8635, 740M pack)",
+      "description": "Real-device bench: generic 740M .litertlm on Realme GT 6 (SM8635), per-modality backend accept/reject + init/infer/RSS for text + real DCIM photo + 30s audio window.",
+      "status": "completed",
+      "priority": "high",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "passing",
+        "files": [
+          "docs/bench/sm8635-full.md"
+        ],
+        "notes": "Device-only (needs LiteRT-LM + phone); verified by the on-device run itself: NPU rejected (audio executor), GPU accepted all three — text 58ms, image 932ms, audio 3525ms, RSS 361MB. Rerun via make bench-device."
+      },
+      "subtasks": [],
+      "notes": "GO (GPU). NPU rejection is a recorded negative result — one engine serves all three encoders so init fails as a unit. 255 JVM tests still green.",
+      "added": "2026-10-30",
+      "completed": "2026-10-30"
     }
   ]
 }

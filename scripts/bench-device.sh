@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
-# bench-device: capability baseline + one-query smoke benchmark (see docs/bench/).
+# bench-device: full-modality benchmark, generic EmbeddingGemma 2 740M pack (see docs/bench/).
 # Usage: make bench-device  (honours DEVICE=..., default 8316b289; MODEL=... overrides)
+# Flow: device fingerprint -> pull one real DCIM photo (if none staged yet) ->
+# push model + photo + 30s audio fixture -> am start --ez bench true -> poll for
+# files/bench-sm8635-full.json (pulled to docs/bench/last-full.json).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 DEV="${DEVICE:-8316b289}"
-ADB="${ANDROID_SDK_ROOT:-$HOME/android-sdk}/platform-tools/adb"
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"
+export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/android-sdk}"
+ADB="${ANDROID_SDK_ROOT}/platform-tools/adb"
 APK="android/build/outputs/apk/debug/android-debug.apk"
-MODEL="${MODEL:-/tmp/opencode/models/embeddinggemma-2-text-270m.litertlm}"
+MODEL="${MODEL:-/tmp/opencode/models/embeddinggemma-2-740m.litertlm}"
+MODEL_NAME="$(basename "$MODEL")"
+PHOTO_LOCAL="/tmp/opencode/bench-photo.jpg"
+AUDIO_LOCAL="${AUDIO_FIXTURE:-/tmp/opencode/bench-audio.wav}"
+APP_ID="com.filesearch.android"
 
 echo "== device fingerprint =="
 PHONEMODEL=$($ADB -s "$DEV" shell getprop ro.product.model | tr -d '\r')
@@ -36,12 +45,37 @@ echo "== CPU =="
 $ADB -s "$DEV" shell cat /proc/cpuinfo | grep -m4 -i 'processor\|Hardware\|model name' | tr -d '\r' || true
 
 echo "baseline ok"
-echo "== smoke benchmark =="
+echo "== full-modality benchmark (740M) =="
+
+test -f "$MODEL" || { echo "missing model: $MODEL"; exit 1; }
+test -f "$AUDIO_LOCAL" || python3 scripts/make-audio-fixture.py "$AUDIO_LOCAL"
+
+if [ ! -f "$PHOTO_LOCAL" ]; then
+  echo "pulling one real photo from DCIM (read-only, nothing added to the phone)..."
+  CANDIDATE=$($ADB -s "$DEV" shell 'ls /sdcard/DCIM/Camera/*.jpg 2>/dev/null | head -1; ls /sdcard/DCIM/*.jpg 2>/dev/null | head -1' | tr -d '\r' | head -1)
+  test -n "$CANDIDATE" || { echo "no JPEG found under /sdcard/DCIM"; exit 1; }
+  echo "photo: $CANDIDATE"
+  $ADB -s "$DEV" pull "$CANDIDATE" "$PHOTO_LOCAL"
+fi
+
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}"
 ./gradlew :android:assembleDebug --console=plain -q
 $ADB -s "$DEV" install -r "$APK"
-$ADB -s "$DEV" push "$MODEL" /data/local/tmp/embeddinggemma-2-text-270m.litertlm
-$ADB -s "$DEV" shell am start -n com.filesearch.android/.MainActivity --ez bench true
-echo "waiting for bench (~60s: ~10s init + copy)..."
-sleep 60
-$ADB -s "$DEV" shell "run-as com.filesearch.android cat files/bench-sm8635.json"
+echo "pushing model ($(du -h "$MODEL" | cut -f1)) + fixtures..."
+$ADB -s "$DEV" push "$MODEL" "/data/local/tmp/$MODEL_NAME"
+$ADB -s "$DEV" push "$PHOTO_LOCAL" /data/local/tmp/bench-photo.jpg
+$ADB -s "$DEV" push "$AUDIO_LOCAL" /data/local/tmp/bench-audio.wav
+$ADB -s "$DEV" shell am start -n "$APP_ID/.MainActivity" --ez bench true
+echo "waiting for bench (740M init + 3 infers can take several minutes)..."
+for i in $(seq 1 40); do
+  sleep 15
+  if $ADB -s "$DEV" shell "run-as $APP_ID cat files/bench-sm8635-full.json" > docs/bench/last-full.json 2>/dev/null \
+    && python3 -c "import json; json.load(open('docs/bench/last-full.json'))" 2>/dev/null; then
+    echo "result pulled to docs/bench/last-full.json after ~$((i * 15))s"
+    cat docs/bench/last-full.json
+    exit 0
+  fi
+done
+echo "timed out waiting for files/bench-sm8635-full.json — check logcat:"
+echo "  $ADB -s $DEV logcat -d -s EmbeddingBench | tail -30"
+exit 1

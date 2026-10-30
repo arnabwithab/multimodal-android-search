@@ -42,6 +42,7 @@ covered only by the full 740M repo, so the staged-download plan
 sizes, per-file SHAs, on-device latency/RSS per SoC. Picker at first run: exact SoC match → generic NPU → GPU → XNNPACK CPU. Backends: Pixel TPU/NPU → Qualcomm NPU → GPU → CPU, with auto-fallback when a delegate rejects ops (split execution hurts more than it helps — same lesson as NNAPI/GPU delegate docs).
 
 > Measured 2026-10-18 (Realme GT 6, SM8635, generic 270M pack, 1 query): NPU accepted — init 9718ms, infer 211ms, RSS 739MB; GPU/CPU not probed (first-accept wins). Full note: `docs/bench/sm8635-generic.md`.
+> Measured 2026-10-30 (same phone, generic 740M pack, text+image+audio): NPU REJECTED (audio executor won't compile) — GPU accepted, init 11942ms, text 58ms / image 932ms / audio 3525ms, dim 768, RSS 361MB. Full note: `docs/bench/sm8635-full.md`.
 
 Input contracts (from model cards + DigUp):
 

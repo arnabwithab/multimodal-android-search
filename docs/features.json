@@ -451,7 +451,7 @@
           "status": "planned"
         }
       ],
-      "notes": "Includes the 5-step manual mic pass from docs/bench/sm8635-voice.md (speak 3 queries incl. non-English, speaker playback, airplane fallback) once the search UI exists.",
+      "notes": "Includes the 5-step manual mic pass from docs/bench/sm8635-voice.md (speak 3 queries incl. non-English, speaker playback, airplane fallback) once the search UI exists. UI simplification: Scaffold+TopAppBar pinned headings (fixes black-on-dark), stock M3 roles, dark coherent, 13 snapshots.",
       "added": "2026-10-30",
       "completed": "2026-10-30"
     },

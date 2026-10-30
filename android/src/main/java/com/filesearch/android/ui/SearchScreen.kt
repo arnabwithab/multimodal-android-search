@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DockedSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
@@ -36,9 +35,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -97,8 +98,15 @@ fun SearchScreenContent(
 ) {
     FileSearchTheme {
         var active by remember { mutableStateOf(false) }
-        Column(modifier = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-            DockedSearchBar(
+        // Stock Scaffold + TopAppBar: Surface supplies the content color (bare
+        // Texts rendered black-on-dark without it) and the bar keeps a visible
+        // heading above the search field. Search bar + mic is the one action.
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            topBar = { TopAppBar(title = { Text("FileSearch") }) },
+        ) { padding ->
+            Column(modifier = Modifier.padding(padding).fillMaxSize().padding(horizontal = 16.dp)) {
+                DockedSearchBar(
                 query = query,
                 onQueryChange = onQueryChange,
                 onSearch = { active = false },
@@ -178,7 +186,7 @@ fun SearchScreenContent(
             }
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(top = 12.dp).testTag("resultList"),
+                modifier = Modifier.weight(1f).padding(top = 12.dp).testTag("resultList"),
             ) {
                 itemsIndexed(visibleRows, key = { _, row -> row.thumbKey + row.fileName + row.locLabel + row.excerpt }) { i, row ->
                     ResultRow(
@@ -190,7 +198,9 @@ fun SearchScreenContent(
                 }
             }
             if (weakCount > 0) {
-                OutlinedButton(
+                // Secondary fold control: text button so the search bar stays
+                // the screen's one primary action.
+                TextButton(
                     onClick = onToggleExpanded,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("weakFold"),
                 ) {
@@ -203,6 +213,7 @@ fun SearchScreenContent(
                 }
             }
         }
+        }
     }
 }
 
@@ -213,20 +224,15 @@ private fun ResultRow(
     onOpenResult: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            ),
-    ) {
+    // Stock Card defaults: M3 picks container/shape, content color inherited.
+    Card(modifier = modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(12.dp),
         ) {
-            // Thumb placeholder: tonal tile keyed by kind; real covers load on device later.
+            // Thumb tile: stock circle in tonal container, keyed by kind.
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = CircleShape,
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 modifier = Modifier.size(56.dp),
             ) {
@@ -239,40 +245,22 @@ private fun ResultRow(
                 }
             }
             Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    row.fileName,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                // One meta line (kind + location) instead of two custom pills.
+                val meta =
+                    listOf(row.kind, row.locLabel).filter { it.isNotEmpty() }.joinToString(" • ")
+                if (meta.isNotEmpty()) {
                     Text(
-                        row.fileName,
-                        style = MaterialTheme.typography.titleSmall,
+                        meta,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (row.locLabel.isNotEmpty()) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            modifier = Modifier.padding(start = 8.dp),
-                        ) {
-                            Text(
-                                row.locLabel,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
-                        }
-                    }
-                }
-                // Kind badge.
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.padding(top = 4.dp),
-                ) {
-                    Text(
-                        row.kind,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                     )
                 }
                 // Engine-marked «match» excerpt, shown verbatim.

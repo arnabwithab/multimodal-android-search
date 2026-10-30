@@ -1,7 +1,8 @@
 package com.filesearch.android.ui
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -9,6 +10,7 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,36 +32,52 @@ fun FileSearchApp(
     status: @Composable () -> Unit,
     settings: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    // Controlled-tab seam (every-button audit): when [tab] is non-null the
+    // host owns navigation (e.g. Status "Back to Search" sets tab 0);
+    // otherwise the bar keeps its own internal tab (Paparazzi/tests).
+    tab: Int? = null,
+    onTabChange: ((Int) -> Unit)? = null,
 ) {
     FileSearchTheme {
-        var tab by rememberSaveable { mutableStateOf(0) }
-        Column(modifier = modifier) {
-            Box(modifier = Modifier.weight(1f)) {
-                when (tab) {
+        var internalTab by rememberSaveable { mutableStateOf(0) }
+        val selected = tab ?: internalTab
+        fun select(i: Int) {
+            if (onTabChange != null) onTabChange(i) else internalTab = i
+        }
+        // Stock M3: one Scaffold owns the bottom bar and its insets; each tab
+        // screen is plain content (its own Scaffold/TopAppBar when it needs a
+        // heading). Previously a hand-rolled Column(statusBarsPadding) here.
+        Scaffold(
+            modifier = modifier,
+            bottomBar = {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = selected == 0,
+                        onClick = { select(0) },
+                        icon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        label = { Text("Search") },
+                    )
+                    NavigationBarItem(
+                        selected = selected == 1,
+                        onClick = { select(1) },
+                        icon = { Icon(Icons.Filled.Sync, contentDescription = null) },
+                        label = { Text("Status") },
+                    )
+                    NavigationBarItem(
+                        selected = selected == 2,
+                        onClick = { select(2) },
+                        icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                        label = { Text("Settings") },
+                    )
+                }
+            },
+        ) { padding ->
+            Box(modifier = Modifier.padding(padding).fillMaxSize()) {
+                when (selected) {
                     0 -> search()
                     1 -> status()
                     else -> settings()
                 }
-            }
-            NavigationBar {
-                NavigationBarItem(
-                    selected = tab == 0,
-                    onClick = { tab = 0 },
-                    icon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    label = { Text("Search") },
-                )
-                NavigationBarItem(
-                    selected = tab == 1,
-                    onClick = { tab = 1 },
-                    icon = { Icon(Icons.Filled.Sync, contentDescription = null) },
-                    label = { Text("Status") },
-                )
-                NavigationBarItem(
-                    selected = tab == 2,
-                    onClick = { tab = 2 },
-                    icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
-                    label = { Text("Settings") },
-                )
             }
         }
     }

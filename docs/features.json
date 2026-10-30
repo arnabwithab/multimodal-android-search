@@ -3,9 +3,9 @@
   "last_updated": "2026-10-30",
   "summary": {
     "total": 20,
-    "completed": 17,
+    "completed": 18,
     "in_progress": 0,
-    "planned": 3,
+    "planned": 2,
     "tests_passing": 255,
     "tests_failing": 0,
     "tests_missing": 3
@@ -371,21 +371,21 @@
       "id": "F017",
       "name": "Extraction parity on device",
       "description": "PdfiumAndroid vs desktop render/text parity, ImageDecoder HEIC decode, ML Kit OCR gap check (incl. Bengali vowel-sign order), Media3 PCM level check for the -50dB gate, MMR frame accuracy + MTS 12s seek-back.",
-      "status": "planned",
+      "status": "completed",
       "priority": "high",
       "module": "android/src/main/java/com/filesearch/android",
       "design_doc": "docs/architecture.md",
       "tests": {
-        "status": "missing",
+        "status": "passing",
         "files": [
           "android/src/androidTest/java/com/filesearch/android/ExtractionParityTest.kt"
         ],
-        "notes": ""
+        "notes": "5/5 instrumented probes PASS on SM8635 (Realme GT 6); Bengali OCR gap + missing HEIC decoder + MTS seek-back RECORDED in docs/bench/sm8635-extraction.md"
       },
       "subtasks": [],
-      "notes": "needs phone + 740M model on device",
+      "notes": "done 2026-10-30: axet pdfium (text API) used — barteksc/mhiew are render-only; assets in android/src/androidTest/assets/f017/ via scripts/make-extraction-fixtures.py",
       "added": "2026-10-30",
-      "completed": null
+      "completed": "2026-10-30"
     },
     {
       "id": "F018",

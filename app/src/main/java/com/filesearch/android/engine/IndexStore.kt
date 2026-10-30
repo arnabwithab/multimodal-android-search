@@ -126,23 +126,14 @@ class IndexStore(val dbPath: String) : AutoCloseable {
     init {
         exec("PRAGMA foreign_keys=ON")
         exec("PRAGMA journal_mode=WAL")
-        exec(
-            "CREATE TABLE IF NOT EXISTS files(id INTEGER PRIMARY KEY, path TEXT UNIQUE, kind TEXT, " +
-                "size INTEGER, mtime INTEGER, inode INTEGER, device INTEGER, state TEXT, detail TEXT, info TEXT, indexed_at INTEGER)",
-        )
-        exec(
-            "CREATE TABLE IF NOT EXISTS segments(id INTEGER PRIMARY KEY, file_id INTEGER NOT NULL, kind TEXT, modality TEXT, " +
-                "loc REAL, loc_end REAL, excerpt TEXT, vec BLOB, FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE)",
-        )
-        exec("CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT)")
+        exec(IndexSchema.DDL_FILES)
+        exec(IndexSchema.DDL_SEGMENTS)
+        exec(IndexSchema.DDL_META)
         try {
-            exec(
-                "CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(name, body, " +
-                    "original UNINDEXED, tokenize=\"porter unicode61 remove_diacritics 2 categories 'L* N* Co M*'\")",
-            )
+            exec(IndexSchema.DDL_FTS_FULL)
         } catch (_: SQLException) {
             // Old SQLite without remove_diacritics 2 / categories args: fall back to plain porter+unicode61.
-            exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(name, body, original UNINDEXED, tokenize=\"porter unicode61\")")
+            exec(IndexSchema.DDL_FTS_FALLBACK)
         }
     }
 

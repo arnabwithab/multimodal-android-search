@@ -42,13 +42,14 @@ fun backoffMs(attempt: Int): Long = minOf(BACKOFF_BASE_MS shl attempt.coerceIn(0
 const val WATCHDOG_STUCK_MS = 5 * 60 * 1000L
 
 /**
- * True when no progress for longer than [WATCHDOG_STUCK_MS].
+ * True when no progress for longer than [stuckAfterMs] (default [WATCHDOG_STUCK_MS]).
  * Caller kills the job, marks the file stopped, and keeps partial segments.
  */
 fun watchdogTripped(
     lastProgressMs: Long,
     nowMs: Long,
-): Boolean = nowMs - lastProgressMs > WATCHDOG_STUCK_MS
+    stuckAfterMs: Long = WATCHDOG_STUCK_MS,
+): Boolean = nowMs - lastProgressMs > stuckAfterMs
 
 /**
  * Honest "≈N min left" estimator (arch §6): per-kind ms/file running averages.

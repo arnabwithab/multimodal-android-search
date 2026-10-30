@@ -2,11 +2,11 @@
   "project": "multimodal-search-for-android",
   "last_updated": "2026-10-30",
   "summary": {
-    "total": 21,
-    "completed": 21,
+    "total": 23,
+    "completed": 22,
     "in_progress": 0,
-    "planned": 0,
-    "tests_passing": 259,
+    "planned": 1,
+    "tests_passing": 261,
     "tests_failing": 0,
     "tests_missing": 2
   },
@@ -475,6 +475,67 @@
       "notes": "Probe corrected F017: MediaCodecList still-mime query is null (encoder only) BUT ImageDecoder decodes sample.heic to 1280x854 via the software HEVC decoder (c2.android.hevc.decoder) — so HeicSupport probes still-mime OR video/hevc (present=true here, no skips on this phone). Engine plan() gained heicDecoderPresent (default true, so other phones never newly skip); false + HEIC -> skipped:no-heic-decoder. F020-1 manual mic checklist still planned for the human.",
       "added": "2026-10-30",
       "completed": "2026-10-30"
+    },
+    {
+      "id": "F022",
+      "name": "Live indexing wiring",
+      "description": "Engine consumable from :android (srcDir, one source of truth), Android SQLite backend with same schema, on-device LiteRT embed path (740M GPU), Index-now button + first-launch auto-start, worker progress into status sheet. First corpus: phone Pictures via MediaStore. Photos/screenshots only.",
+      "status": "completed",
+      "priority": "high",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "passing",
+        "files": [
+          "app/src/test/java/com/filesearch/android/engine/IndexSchemaTest.kt",
+          "android/src/androidTest/java/com/filesearch/android/DeviceIndexStoreTest.kt",
+          "android/src/androidTest/java/com/filesearch/android/IndexNowSmokeTest.kt"
+        ],
+        "notes": "JVM 261/261 green via make test (incl. 2 new IndexSchemaTest); DeviceIndexStoreTest 3/3 PASS on SM8635 (bundled-SQLite FTS5 round-trip, fingerprint wipe); IndexNowSmokeTest PASS (worker 2/2 real photos + bench-photo real-vector dim256/norm1.0/FTS match); BackgroundFieldTest 5/5 + SearchUiTest 3/3 still green; manual run indexed 50/50 Pictures, status shows Index-now + image 50/50 + done; greptile-reviewed BLOCKED then fixed, re-reviewed PASS; make test + make style green"
+      },
+      "subtasks": [
+        {
+          "id": "F022-1",
+          "name": "IndexSchema single source + srcDir",
+          "status": "completed"
+        },
+        {
+          "id": "F022-2",
+          "name": "DeviceIndexStore + round-trip test",
+          "status": "completed"
+        },
+        {
+          "id": "F022-3",
+          "name": "LiteRT embed backend + MediaStore pictures + index-now worker",
+          "status": "completed"
+        },
+        {
+          "id": "F022-4",
+          "name": "Index-now button + auto-start + progress wiring",
+          "status": "completed"
+        }
+      ],
+      "notes": "Device record: framework SQLite has NO FTS5 module (no such module: fts5 on SM8635) — backend is androidx.sqlite:sqlite-bundled 2.7.1 (BundledSQLiteDriver, FTS5 documented), same IndexSchema DDL. shortcut: SAF picker + observer auto-index = F023; OCR body text + filename doc-vector + skip-unchanged resume later; --ez indexnow seam kept for headless runs (like bench mode)",
+      "added": "2026-10-30",
+      "completed": "2026-10-30"
+    },
+    {
+      "id": "F023",
+      "name": "SAF folder picker + auto-index",
+      "description": "SAF folder picker with persisted permissions, MediaStore observer triggering background auto-index, skip-unchanged resume, OCR body text.",
+      "status": "planned",
+      "priority": "high",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "missing",
+        "files": [],
+        "notes": ""
+      },
+      "subtasks": [],
+      "notes": "",
+      "added": "2026-10-30",
+      "completed": null
     }
   ]
 }

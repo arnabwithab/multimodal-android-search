@@ -5,7 +5,9 @@
     <!-- F019 voice: mic for on-device STT input, network only for opt-in cloud. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- F018: expedited crawl worker runs as a dataSync foreground service. -->
+    <!-- F022: first corpus is phone Pictures via MediaStore (read-only; F023 adds SAF). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 

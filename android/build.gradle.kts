@@ -1,12 +1,16 @@
 // Android shell module (v1): plain Activity, no Compose, no engine coupling.
-// Choice: NO project(":app") dependency. :app is kotlin("jvm")-only; wiring it
-// as an Android dependency (or shared sourceDir) risks breaking `make test`.
-// Engine sharing comes later (extract engine to a Kotlin library module); the
-// shell only needs to install + launch for now.
+// Choice: NO project(":app") dependency. :app is kotlin("jvm")-only; instead
+// :android compiles the same engine sources directly (srcDir below) — one
+// source of truth, zero mirrors. Every engine import (java.io/nio/text/
+// security/concurrent, kotlin.math; java.sql only in IndexStore, which
+// compiles on Android but is never called on device) already resolves under
+// the Android bootclasspath, so this is a one-liner with no file moves and
+// `make test` (:app:test only) untouched. A :core library module is the
+// long-term home once device-only deps arrive.
+// shortcut: graduate this srcDir into a :core module when Hilt/device-only deps land.
 plugins {
     id("com.android.application") version "8.10.1"
-    kotlin("android") version "2.3.21"
-    // F020 Compose UI binding (thin; engine logic stays in :app via hand-mirrored params).
+    kotlin("android") version "2.3.21"    // F020 Compose UI binding (thin; engine logic stays in :app via hand-mirrored params).
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.21"
     // F020 Paparazzi snapshots run on JVM (:android:testDebugUnitTest, no device).
     // 2.0.0-alpha02: sdk-common 31.10.1 == AGP 8.10.1's own (newer sdk-common
@@ -42,6 +46,11 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // F022: compile engine sources directly (see header comment).
+    sourceSets {
+        getByName("main").java.srcDir(rootProject.file("app/src/main/java"))
+    }
 }
 
 dependencies {
@@ -54,6 +63,10 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.2")
     // Voice keys at rest (arch §7): EncryptedSharedPreferences only.
     implementation("androidx.security:security-crypto:1.1.0")
+    // F022 device index: bundled SQLite — the framework SQLite has no FTS5
+    // module (recorded on SM8635); arch §5 needs the exact porter/unicode61
+    // tokenizer and BundledSQLiteDriver officially supports FTS5. Same IndexSchema DDL.
+    implementation("androidx.sqlite:sqlite-bundled:2.7.1")
     // F017 extraction parity (device-only; engine untouched):
     // axet fork exposes FPDFText (page text layer); barteksc/mhiew are render-only.
     androidTestImplementation("com.github.axet:pdfium:2.0.16")
@@ -67,6 +80,9 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
+    // Mic / nav / status icons (F020 UI polish): core + extended for Icons.Filled.Mic et al.
+    implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose")
     // F020 Paparazzi snapshots (JVM unit tests, no device).
     testImplementation("junit:junit:4.13.2")

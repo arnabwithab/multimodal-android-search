@@ -5,6 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.BatteryManager
 import android.os.PowerManager
 import android.os.SystemClock
@@ -13,7 +15,14 @@ import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import com.filesearch.android.engine.Embedder
+import com.filesearch.android.engine.Vectors
+import com.filesearch.android.engine.isHeicFormat
+import com.filesearch.android.engine.isScreenshot
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -45,6 +54,8 @@ class IndexWorker(
         } catch (t: Throwable) {
             Log.w(TAG, "setForeground skipped: ${t.javaClass.simpleName}")
         }
+        val mode = inputData.getString(IN_MODE) ?: MODE_CRAWL
+        if (mode == MODE_INDEX_NOW) return indexNow()
         val dirPath = inputData.getString(IN_DIR) ?: return Result.failure()
         val chargerOnly = inputData.getBoolean(IN_CHARGER_ONLY, false)
         val forced = inputData.getString(IN_FORCE_PAUSE)?.let { runCatching { PauseReason.valueOf(it) }.getOrNull() }
@@ -74,8 +85,131 @@ class IndexWorker(
         )
     }
 
-    override suspend fun getForegroundInfo(): ForegroundInfo {
-        val nm = ctx.getSystemService(NotificationManager::class.java)
+    /**
+     * F022 index-now: newest MediaStore photos (cap [IN_MAX_FILES]) through the
+     * 740M pack into [DeviceIndexStore], one image segment per photo (vector =
+     * meaning, FTS name/body = filename words). OCR body text + skip-unchanged
+     * resume are F023 tuning — every run currently re-embeds the cap.
+     */
+    private suspend fun indexNow(): Result {
+        val maxFiles = inputData.getInt(IN_MAX_FILES, 50).coerceIn(1, 200)
+        val chargerOnly = inputData.getBoolean(IN_CHARGER_ONLY, false)
+        val pauseCheck = devicePauseCheck(applicationContext, chargerOnly)
+        val store = DeviceIndexStore(applicationContext)
+        try {
+            val backend = LitertEmbedBackend(applicationContext)
+            try {
+                val embedder = Embedder(backend, LitertEmbedBackend.FP_DIM)
+                val fp =
+                    embedder.fingerprint(
+                        LitertEmbedBackend.FP_MODEL,
+                        LitertEmbedBackend.FP_REV,
+                        LitertEmbedBackend.FP_RUNTIME,
+                        LitertEmbedBackend.FP_DTYPE,
+                        LitertEmbedBackend.FP_BUDGETS,
+                    )
+                if (!store.checkFingerprint(fp)) Log.i(TAG, "fingerprint changed, full re-embed")
+                // Fail fast on a missing model (else every photo fails with the same error).
+                try {
+                    embedder.embedQuery("warmup")
+                } catch (t: Throwable) {
+                    val msg = (t.message ?: t.javaClass.simpleName).take(200)
+                    Log.w(TAG, "embed backend unavailable: $msg")
+                    return Result.failure(Data.Builder().putString(OUT_ERROR, msg).build())
+                }
+                val pics =
+                    try {
+                        MediaPictures.list(applicationContext.contentResolver, maxFiles)
+                    } catch (t: SecurityException) {
+                        val msg = "no-media-permission (grant Photos access, then Index now): ${(t.message ?: "").take(120)}"
+                        return Result.failure(Data.Builder().putString(OUT_ERROR, msg).build())
+                    }
+                var indexed = 0
+                var done = 0
+                var pauseReason = PauseReason.OK
+                setProgress(Data.Builder().putInt(PROG_DONE, 0).putInt(PROG_TOTAL, pics.size).build())
+                for (p in pics) {
+                    if (isStopped) break
+                    val reason = pauseCheck()
+                    if (reason != PauseReason.OK) {
+                        pauseReason = reason
+                        break
+                    }
+                    try {
+                        indexOnePhoto(store, embedder, p)
+                        indexed++
+                    } catch (t: Throwable) {
+                        val msg = (t.message ?: t.javaClass.simpleName).take(160)
+                        Log.w(TAG, "index failed ${p.name}: $msg")
+                        store.upsertFile(p.uri.toString(), "image", -1L, p.dateModified, "failed", msg)
+                    }
+                    done++
+                    setProgress(Data.Builder().putInt(PROG_DONE, done).putInt(PROG_TOTAL, pics.size).build())
+                }
+                Log.i(TAG, "index-now done indexed=$indexed total=${pics.size} pause=$pauseReason")
+                return Result.success(
+                    Data.Builder()
+                        .putInt(OUT_INDEXED, indexed)
+                        .putInt(OUT_TOTAL, pics.size)
+                        .putString(OUT_PAUSE_REASON, pauseReason.name)
+                        .build(),
+                )
+            } finally {
+                backend.close()
+            }
+        } finally {
+            store.close()
+        }
+    }
+
+    private fun indexOnePhoto(
+        store: DeviceIndexStore,
+        embedder: Embedder,
+        p: PicRow,
+    ) {
+        val jpeg = sampledJpeg(p) ?: throw IllegalStateException("undecodable image bytes")
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        applicationContext.contentResolver.openInputStream(p.uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+        val shot = isScreenshot(p.uri.toString(), p.bucket)
+        val plan =
+            com.filesearch.android.engine.plan(
+                opts.outWidth,
+                opts.outHeight,
+                shot,
+                p.name.substringAfterLast('.', ""),
+                HeicSupport.hasHeicDecoder(),
+            )
+        if (plan.skipReason != null) {
+            store.upsertFile(p.uri.toString(), if (shot) "screenshot" else "image", jpeg.size.toLong(), p.dateModified, "failed", plan.skipReason)
+            return
+        }
+        val vec = embedder.embedImage(jpeg)
+        val kind = if (shot) "screenshot" else "image"
+        // shortcut: single image segment per photo; filename doc-vector + OCR body text are F023 tuning.
+        val id = store.upsertFile(p.uri.toString(), kind, jpeg.size.toLong(), p.dateModified, "done")
+        store.addSegment(id, kind, "image", p.name, fp16Bytes(vec), p.name, p.name, p.name)
+    }
+
+    /** Downsamples to a 1024-longest-side JPEG for the vision encoder (never upscales). */
+    private fun sampledJpeg(p: PicRow): ByteArray? {
+        val resolver = applicationContext.contentResolver
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(p.uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        if (isHeicFormat(p.name) && !HeicSupport.hasHeicDecoder()) return null
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1024) sample *= 2
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        val bmp = resolver.openInputStream(p.uri)?.use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
+        try {
+            val out = ByteArrayOutputStream()
+            return if (bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)) out.toByteArray() else null
+        } finally {
+            bmp.recycle()
+        }
+    }
+
+    override suspend fun getForegroundInfo(): ForegroundInfo {        val nm = ctx.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL, "Indexing", NotificationManager.IMPORTANCE_LOW))
         val note = Notification.Builder(ctx, CHANNEL)
             .setContentTitle("Indexing files")
@@ -89,6 +223,24 @@ class IndexWorker(
         const val TAG = "IndexWorker"
         const val IN_DIR = "dirPath"
         const val IN_CHARGER_ONLY = "chargerOnly"
+
+        /** "crawl" (F018 fixture walk, default) or "index_now" (F022 MediaStore photos). */
+        const val IN_MODE = "mode"
+        const val MODE_CRAWL = "crawl"
+        const val MODE_INDEX_NOW = "index_now"
+
+        /** First-corpus cap (F022: Pictures only, newest first). */
+        const val IN_MAX_FILES = "maxFiles"
+
+        /** Unique work name the status sheet observes. */
+        const val UNIQUE_WORK = "index-now"
+
+        /** Live progress keys (setProgress) + terminal output keys. */
+        const val PROG_DONE = "done"
+        const val PROG_TOTAL = "total"
+        const val OUT_INDEXED = "indexed"
+        const val OUT_TOTAL = "total"
+        const val OUT_ERROR = "error"
 
         /**
          * Test seam: PauseReason name that short-circuits the device guards so a
@@ -125,6 +277,13 @@ class IndexWorker(
             shouldPause(thermalSevere, batteryLow, dozing, chargerOnly, onCharger)
         }
     }
+}
+
+/** fp16 L2-normed vector -> little-endian BLOB (engine Vectors fp16 helpers, storage only). */
+private fun fp16Bytes(v: FloatArray): ByteArray {
+    val buf = ByteBuffer.allocate(v.size * 2).order(ByteOrder.LITTLE_ENDIAN)
+    for (x in v) buf.putShort(Vectors.floatToFp16Bits(x))
+    return buf.array()
 }
 
 /** Outcome of one [crawlDirectory] run. Partial progress is always kept. */

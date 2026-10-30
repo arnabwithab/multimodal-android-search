@@ -12,12 +12,8 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ForegroundInfo
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.io.File
-import java.util.UUID
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -128,22 +124,6 @@ class IndexWorker(
             val onCharger = bm?.isCharging == true
             shouldPause(thermalSevere, batteryLow, dozing, chargerOnly, onCharger)
         }
-
-        /** Expedited first-pass request over [dir] (arch §6). */
-        fun buildCrawlRequest(dir: File, chargerOnly: Boolean): androidx.work.OneTimeWorkRequest =
-            OneTimeWorkRequestBuilder<IndexWorker>()
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .setInputData(
-                    Data.Builder()
-                        .putString(IN_DIR, dir.absolutePath)
-                        .putBoolean(IN_CHARGER_ONLY, chargerOnly)
-                        .build(),
-                )
-                .addTag("field-crawl")
-                .build()
-
-        fun enqueueCrawl(context: Context, dir: File, chargerOnly: Boolean): UUID =
-            buildCrawlRequest(dir, chargerOnly).also { WorkManager.getInstance(context).enqueue(it) }.id
     }
 }
 

@@ -43,6 +43,9 @@ RSS from `/proc/self/status`. Rerun: `make bench-device`
 - Native dim is 768; the engine truncates + re-normalises to 256d v1
   (`Vectors.truncateRenorm`) — unchanged by this run.
 - Raw JSON: `docs/bench/last-full.json` (scratch artifact, regenerated per run).
+- Confirmation: a second `make bench-device` run the same day reproduced this
+  result bit-for-bit (same init/infer/RSS); run heap split native ~12 MB /
+  Java ~10 MB, MemAvailable ~2.4 GB re-read post-run.
 
 ## Verdict
 

@@ -126,11 +126,38 @@ class DeviceIndexStore(ctx: Context) : AutoCloseable {
         }
     }
 
+    @Synchronized
     fun matchTerms(query: String): List<Long> {
         conn.prepare("SELECT rowid FROM fts WHERE fts MATCH ?").use { q ->
             q.bindText(1, query)
             return buildList {
                 while (q.step()) add(q.getLong(0))
+            }
+        }
+    }
+
+    /** All segments + file path + FTS name for the query path (F024 brute-force read). */
+    // shortcut: loc/loc_end not selected, so formatLoc hardcodes 0.0 (photos only) — select+store when pdf/audio land (F023+).
+    @Synchronized
+    fun readSegments(): List<StoredSeg> {
+        conn.prepare(
+            "SELECT s.id, f.path, s.kind, s.modality, s.excerpt, s.vec, fts.name " +
+                "FROM segments s JOIN files f ON s.file_id = f.id LEFT JOIN fts ON fts.rowid = s.id",
+        ).use { q ->
+            return buildList {
+                while (q.step()) {
+                    add(
+                        StoredSeg(
+                            id = q.getLong(0),
+                            path = q.getText(1),
+                            kind = q.getText(2),
+                            modality = q.getText(3),
+                            excerpt = if (q.isNull(4)) null else q.getText(4),
+                            vec = if (q.isNull(5)) null else q.getBlob(5),
+                            ftsName = if (q.isNull(6)) "" else q.getText(6),
+                        ),
+                    )
+                }
             }
         }
     }

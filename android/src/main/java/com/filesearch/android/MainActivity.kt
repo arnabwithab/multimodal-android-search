@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.filesearch.android.app.formatRemaining
+import com.filesearch.android.engine.Embedder
 import com.filesearch.android.ui.FileSearchApp
 import com.filesearch.android.ui.KindProgress
 import com.filesearch.android.ui.SearchRowUi
@@ -36,6 +38,7 @@ import com.filesearch.android.ui.SettingsScreenContent
 import com.filesearch.android.ui.StatusSheetContent
 import java.io.File
 import kotlin.concurrent.thread
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -140,6 +143,51 @@ class MainActivity : ComponentActivity() {
         var indexDone by remember { mutableStateOf(0) }
         var indexTotal by remember { mutableStateOf(0) }
         var indexState by remember { mutableStateOf("not started") }
+        // F024: live search rows (DeviceSearch over DeviceIndexStore + LiteRT query
+        // embed; kindHint stays null until kind-hint parsing lands in F023+).
+        var strongRows by remember { mutableStateOf<List<SearchRowUi>>(emptyList()) }
+        var weakRows by remember { mutableStateOf<List<SearchRowUi>>(emptyList()) }
+        var searching by remember { mutableStateOf(false) }
+        val searchStore = remember { DeviceIndexStore(this) }
+        val searchBackend = remember { LitertEmbedBackend(this) }
+        val searchEmbedder = remember { Embedder(searchBackend, LitertEmbedBackend.FP_DIM) }
+        DisposableEffect(Unit) {
+            onDispose {
+                runCatching { searchStore.close() }
+                runCatching { searchBackend.close() }
+            }
+        }
+        // Debounced query path (typing + voice onHeard both land in query).
+        // Off Main: embed + DB read run on IO; LiteRT stays single-flight
+        // behind its own mutex. Stale guard: only the latest query paints.
+        // shortcut: search opens its own LiteRT engine; a concurrent
+        // index-now run holds a second one (~700MB RSS each) — serialize
+        // behind one app-scoped backend when the corpus grows past photos.
+        LaunchedEffect(query) {
+            if (query.isBlank()) {
+                strongRows = emptyList()
+                weakRows = emptyList()
+                searching = false
+                return@LaunchedEffect
+            }
+            searching = true
+            delay(350)
+            val q = query
+            val res =
+                withContext(Dispatchers.IO) {
+                    runCatching { DeviceSearch.search(q, searchStore, searchEmbedder) }.getOrElse { t ->
+                        if (t is CancellationException) throw t
+                        null
+                    }
+                }
+            if (q == query) {
+                if (res != null) {
+                    strongRows = res.strong
+                    weakRows = res.weak
+                }
+                searching = false
+            }
+        }
 
         fun enqueueIndexNow() {
             requestIndexNow()
@@ -232,11 +280,11 @@ class MainActivity : ComponentActivity() {
                     voice = voice,
                     query = query,
                     onQueryChange = { query = it },
-                    // shortcut: empty until live search wiring reads DeviceIndexStore (F023+).
-                    visibleRows = emptyList<SearchRowUi>(),
-                    weakCount = 0,
+                    visibleRows = if (expanded) strongRows + weakRows else strongRows,
+                    weakCount = weakRows.size,
                     expanded = expanded,
                     onToggleExpanded = { expanded = !expanded },
+                    searching = searching,
                     onHeard = { query = it },
                     onOpenResult = {}, // shortcut: no-op until result-open wiring lands.
                 )

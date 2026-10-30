@@ -34,6 +34,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -92,6 +93,7 @@ fun SearchScreenContent(
     onSpeakClick: (SearchRowUi) -> Unit,
     onOpenResult: (SearchRowUi) -> Unit,
     modifier: Modifier = Modifier,
+    searching: Boolean = false,
 ) {
     FileSearchTheme {
         var active by remember { mutableStateOf(false) }
@@ -143,7 +145,12 @@ fun SearchScreenContent(
                     )
                 }
             }
-            if (query.isNotBlank() && visibleRows.isEmpty() && weakCount == 0) {
+            if (searching) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag("searching"),
+                )
+            }
+            if (query.isNotBlank() && !searching && visibleRows.isEmpty() && weakCount == 0) {
                 // Honest empty state (design §6): never a random file.
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -306,6 +313,7 @@ fun SearchScreen(
     onHeard: (String) -> Unit,
     onOpenResult: (SearchRowUi) -> Unit,
     modifier: Modifier = Modifier,
+    searching: Boolean = false,
 ) {
     val context = LocalContext.current
     var listening by remember { mutableStateOf(false) }
@@ -343,6 +351,7 @@ fun SearchScreen(
         // Guillemets are visual marks; strip so TTS does not read them aloud.
         onSpeakClick = { row -> voice.speak(row.excerpt.replace("«", "").replace("»", "")) },
         onOpenResult = onOpenResult,
+        searching = searching,
         modifier = modifier,
     )
 }

@@ -2,13 +2,13 @@
   "project": "multimodal-search-for-android",
   "last_updated": "2026-10-30",
   "summary": {
-    "total": 23,
-    "completed": 22,
+    "total": 24,
+    "completed": 23,
     "in_progress": 0,
     "planned": 1,
     "tests_passing": 261,
     "tests_failing": 0,
-    "tests_missing": 2
+    "tests_missing": 1
   },
   "features": [
     {
@@ -536,6 +536,27 @@
       "notes": "",
       "added": "2026-10-30",
       "completed": null
+    },
+    {
+      "id": "F024",
+      "name": "On-device search query path",
+      "description": "Embed query on device + Searcher fusion over DeviceIndexStore vectors + FTS matchTerms + rows to UI (the missing read half of search).",
+      "status": "completed",
+      "priority": "high",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/design.md",
+      "tests": {
+        "status": "passing",
+        "files": [
+          "android/src/test/java/com/filesearch/android/DeviceSearchTest.kt",
+          "android/src/androidTest/java/com/filesearch/android/DeviceSearchDeviceTest.kt"
+        ],
+        "notes": "greptile-reviewed BLOCKED then fixed, re-reviewed PASS; JVM DeviceSearchTest 9/9 green (:android:testDebugUnitTest, 22/22 incl. Paparazzi); DeviceSearchDeviceTest 4/4 PASS on SM8635 (real store + fake vectors: FTS row, marked excerpt, blank/unknown honest-empty); full device suite 26/27 — ExtractionParityTest OCR fails identically in isolation (MlKitContext not initialized, no overlap with F024 files, pre-existing/environmental); make test 261/261 + make style green"
+      },
+      "subtasks": [],
+      "notes": "kind-hint parsing (e.g. '... in a video') not wired — search() takes kindHint, host passes null until F023+.",
+      "added": "2026-10-30",
+      "completed": "2026-10-30"
     }
   ]
 }

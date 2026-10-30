@@ -2,10 +2,10 @@
   "project": "multimodal-search-for-android",
   "last_updated": "2026-10-30",
   "summary": {
-    "total": 20,
+    "total": 21,
     "completed": 20,
     "in_progress": 0,
-    "planned": 0,
+    "planned": 1,
     "tests_passing": 255,
     "tests_failing": 0,
     "tests_missing": 3
@@ -454,6 +454,26 @@
       "notes": "Includes the 5-step manual mic pass from docs/bench/sm8635-voice.md (speak 3 queries incl. non-English, speaker playback, airplane fallback) once the search UI exists.",
       "added": "2026-10-30",
       "completed": "2026-10-30"
+    },
+    {
+      "id": "F021",
+      "name": "HEIC fallback when no decoder",
+      "description": "Fallback for devices whose ImageDecoder has no HEIC codec (SM8635 recorded in F017): skip-with-reason vs transcode so HEIC files are not silently missed.",
+      "status": "planned",
+      "priority": "medium",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": [
+          "android/src/test/java/com/filesearch/android/HeicFallbackTest.kt"
+        ],
+        "notes": ""
+      },
+      "subtasks": [],
+      "notes": "SM8635 has no HEIC decoder (F017 RECORDED) — ImagePrepare assumes ImageDecoder handles HEIC and silently misses files. Needs phone to verify fallback (skip-with-reason vs transcode). No phone attached now — do NOT implement, register only.",
+      "added": "2026-10-30",
+      "completed": null
     }
   ]
 }

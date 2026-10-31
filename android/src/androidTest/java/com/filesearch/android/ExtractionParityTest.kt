@@ -33,6 +33,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.axet.pdfium.Pdfium
 import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.common.internal.CommonComponentRegistrar
+import com.google.mlkit.common.sdkinternal.MlKitContext
+import com.google.mlkit.vision.common.internal.VisionCommonRegistrar
+import com.google.mlkit.vision.text.internal.TextRegistrar
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -50,6 +54,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -83,6 +88,19 @@ class ExtractionParityTest {
     fun cleanUp() {
         staged.forEach { it.delete() }
         staged.clear()
+    }
+
+    @Before
+    fun initMlKit() {
+        // App init (FileSearchApplication) covers production runs via manifest
+        // discovery. Defensive: if the runner uses a different Application (or
+        // discovery hasn't run), register the bundled-Latin components
+        // explicitly — without them getClient NPEs. initializeIfNeeded: first
+        // test registers, rest reuse.
+        MlKitContext.initializeIfNeeded(
+            appContext,
+            listOf(CommonComponentRegistrar(), VisionCommonRegistrar(), TextRegistrar()),
+        )
     }
 
     private fun stage(asset: String): File {

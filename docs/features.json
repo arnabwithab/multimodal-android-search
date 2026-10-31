@@ -1,14 +1,14 @@
 {
   "project": "multimodal-search-for-android",
-  "last_updated": "2026-10-30",
+  "last_updated": "2026-10-31",
   "summary": {
-    "total": 24,
+    "total": 25,
     "completed": 23,
-    "in_progress": 0,
+    "in_progress": 1,
     "planned": 1,
     "tests_passing": 261,
     "tests_failing": 0,
-    "tests_missing": 1
+    "tests_missing": 2
   },
   "features": [
     {
@@ -557,6 +557,27 @@
       "notes": "kind-hint parsing (e.g. '... in a video') not wired — search() takes kindHint, host passes null until F023+.",
       "added": "2026-10-30",
       "completed": "2026-10-30"
+    },
+    {
+      "id": "F025",
+      "name": "Full-corpus indexing (all image buckets + PDF text)",
+      "description": "Index everything, not the Pictures cap-50 slice: MediaStore Images across ALL buckets unbound with per-50 batch commits, PDF text via MediaStore Files + Pdfium with PdfPages.classifyPage (TEXT pages as kind page segments, first 30 now), per-kind image/pdf status rows.",
+      "status": "in_progress",
+      "priority": "high",
+      "module": "android/src/main/java/com/filesearch/android",
+      "design_doc": "docs/architecture.md",
+      "tests": {
+        "status": "missing",
+        "files": [
+          "android/src/test/java/com/filesearch/android/FullCorpusTest.kt",
+          "android/src/androidTest/java/com/filesearch/android/FullCorpusDeviceTest.kt"
+        ],
+        "notes": "JVM FullCorpusTest 8/8 green via :android:testDebugUnitTest (42/42 forced rerun green); DeviceSearchTest/MediaPreviewTest still green. Device: live run 2026-10-31 enumerated 190 pics across 9 buckets — cap gone; pdfs=0 (API-36 grant reality, no app-visible PDFs). Instrumented proof (count>50 + pdf text + search hit) blocked: phone dropped off adb mid-run, grant is USER_SET-granted for the rerun."
+      },
+      "subtasks": [],
+      "notes": "all MediaStore images unbound + PDF text segments; SAF picker stays F023",
+      "added": "2026-10-31",
+      "completed": null
     }
   ]
 }

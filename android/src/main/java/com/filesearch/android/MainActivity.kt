@@ -46,7 +46,6 @@ import com.filesearch.android.app.formatRemaining
 import com.filesearch.android.app.SettingsState
 import com.filesearch.android.engine.Embedder
 import com.filesearch.android.ui.FileSearchApp
-import com.filesearch.android.ui.KindProgress
 import com.filesearch.android.ui.SearchRowUi
 import com.filesearch.android.ui.progressFraction
 import com.filesearch.android.ui.SearchScreen
@@ -85,7 +84,6 @@ class MainActivity : ComponentActivity() {
                 .setInputData(
                     Data.Builder()
                         .putString(IndexWorker.IN_MODE, IndexWorker.MODE_INDEX_NOW)
-                        .putInt(IndexWorker.IN_MAX_FILES, INDEX_NOW_CAP)
                         .putBoolean(IndexWorker.IN_CHARGER_ONLY, chargerOnly)
                         .build(),
                 )
@@ -192,6 +190,13 @@ class MainActivity : ComponentActivity() {
         // status tab above the sheet; the sheet owns Pause/Resume + Back).
         var indexDone by remember { mutableStateOf(0) }
         var indexTotal by remember { mutableStateOf(0) }
+        var imgDone by remember { mutableStateOf(0) }
+        var imgTotal by remember { mutableStateOf(0) }
+        var pdfDone by remember { mutableStateOf(0) }
+        var pdfTotal by remember { mutableStateOf(0) }
+        // PDF page segments landed (OUT_PDF_INDEXED). pdfDone/pdfTotal stay in
+        // file units; this one is segments — the done label shows both.
+        var pdfSegs by remember { mutableStateOf(0) }
         var indexState by remember { mutableStateOf("not started") }
         // Poll-loop run key: each enqueue bumps this, restarting the
         // LaunchedEffect below so a fresh terminal break still observes the
@@ -390,11 +395,20 @@ class MainActivity : ComponentActivity() {
                             WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> {
                                 indexDone = prog.getInt(IndexWorker.PROG_DONE, 0)
                                 indexTotal = prog.getInt(IndexWorker.PROG_TOTAL, 0)
+                                imgDone = prog.getInt(IndexWorker.PROG_IMAGE_DONE, 0)
+                                imgTotal = prog.getInt(IndexWorker.PROG_IMAGE_TOTAL, 0)
+                                pdfDone = prog.getInt(IndexWorker.PROG_PDF_DONE, 0)
+                                pdfTotal = prog.getInt(IndexWorker.PROG_PDF_TOTAL, 0)
                                 indexState = if (indexTotal > 0) "indexing…" else "starting…"
                             }
                             WorkInfo.State.SUCCEEDED -> {
                                 indexDone = out.getInt(IndexWorker.OUT_INDEXED, indexDone)
                                 indexTotal = out.getInt(IndexWorker.OUT_TOTAL, indexTotal)
+                                imgDone = out.getInt(IndexWorker.OUT_INDEXED, imgDone)
+                                imgTotal = out.getInt(IndexWorker.OUT_TOTAL, imgTotal)
+                                pdfDone = out.getInt(IndexWorker.OUT_PDF_FILES_DONE, pdfDone)
+                                pdfSegs = out.getInt(IndexWorker.OUT_PDF_INDEXED, pdfSegs)
+                                pdfTotal = out.getInt(IndexWorker.OUT_PDF_TOTAL, pdfTotal)
                                 val pause = out.getString(IndexWorker.OUT_PAUSE_REASON)
                                 indexState = if (pause != null && pause != PauseReason.OK.name) "paused: $pause" else "done"
                                 break
@@ -416,14 +430,20 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // F025 full corpus: per-kind image + pdf rows (honest counts either way).
         val kindProgress =
-            if (indexTotal > 0) listOf(KindProgress(kind = "image", done = indexDone.toLong(), total = indexTotal.toLong())) else emptyList()
+            if (indexTotal > 0 || imgTotal > 0 || pdfTotal > 0) {
+                FullCorpus.corpusKindRows(imgDone.toLong(), imgTotal.toLong(), pdfDone.toLong(), pdfTotal.toLong())
+            } else {
+                emptyList()
+            }
         val remainingLabel =
             when {
                 indexTotal <= 0 && indexState == "not started" -> "never indexed — tap Index now"
                 indexState == "indexing…" || indexState == "starting…" -> "indexing $indexDone/$indexTotal…"
                 // Selected-photos grant with nothing visible: say so, don't print "finishing…".
                 indexState == "done" && indexTotal == 0 -> "no photos found — allow full Photos access, then Index now"
+                indexState == "done" && pdfTotal > 0 -> "$imgTotal photos + $pdfSegs pdf pages in $pdfTotal pdfs"
                 indexState == "done" -> formatRemaining(0)
                 else -> indexState
             }
@@ -525,6 +545,11 @@ class MainActivity : ComponentActivity() {
             wifiOnlyModels = true
             indexDone = 0
             indexTotal = 0
+            imgDone = 0
+            imgTotal = 0
+            pdfDone = 0
+            pdfTotal = 0
+            pdfSegs = 0
             indexState = "not started"
             Toast.makeText(this, "App data removed", Toast.LENGTH_SHORT).show()
         }
@@ -609,7 +634,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// F022 constants: first-launch auto-start flag + first-corpus cap (Pictures only, newest first).
+// F025 constants: first-launch auto-start flag (full corpus, unbound — no cap).
 private const val PREFS_F022 = "f022"
 private const val KEY_AUTOSTART_DONE = "autostart_done"
 private const val PREFS_SETTINGS = "settings"
@@ -618,5 +643,4 @@ private const val KEY_CHARGER = "charger_only"
 private const val KEY_WIFI = "wifi_models"
 private const val KEY_STT = "cloud_stt"
 private const val KEY_TTS = "cloud_tts"
-private const val INDEX_NOW_CAP = 50
 private const val TAG = "MainActivity"

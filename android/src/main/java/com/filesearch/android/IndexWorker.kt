@@ -26,6 +26,7 @@ import java.nio.ByteOrder
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.yield
 
 /**
  * Field-test background crawl (F018, arch §6).
@@ -86,13 +87,21 @@ class IndexWorker(
     }
 
     /**
-     * F022 index-now: newest MediaStore photos (cap [IN_MAX_FILES]) through the
-     * 740M pack into [DeviceIndexStore], one image segment per photo (vector =
-     * meaning, FTS name/body = filename words). OCR body text + skip-unchanged
-     * resume are F023 tuning — every run currently re-embeds the cap.
+     * F025 index-now: the full corpus — MediaStore Images across ALL buckets
+     * (unbound) plus MediaStore PDF text (first 30 pages now, tail later) —
+     * through the 740M pack into [DeviceIndexStore]. One image segment per
+     * photo (vector = meaning, FTS name/body = filename words); TEXT pdf pages
+     * become kind=page segments (loc = 0-based page).
+     *
+     * Honest costs: segment commits stream as each embed lands; progress
+     * reports and watchdog-friendly yields fire per [FullCorpus.COMMIT_BATCH]
+     * (50). Every run re-embeds the whole corpus — there is no skip-unchanged
+     * resume (that is F023), so each run costs ~1 image infer per photo plus
+     * ~1 text infer per TEXT pdf page; on battery, prefer charger-only. OCR
+     * body text + SAF trees stay F023.
      */
     private suspend fun indexNow(): Result {
-        val maxFiles = inputData.getInt(IN_MAX_FILES, 50).coerceIn(1, 200)
+        val maxFiles = inputData.getInt(IN_MAX_FILES, Int.MAX_VALUE).coerceIn(1, Int.MAX_VALUE)
         val chargerOnly = inputData.getBoolean(IN_CHARGER_ONLY, false)
         val pauseCheck = devicePauseCheck(applicationContext, chargerOnly)
         val store = DeviceIndexStore(applicationContext)
@@ -124,33 +133,90 @@ class IndexWorker(
                         val msg = "no-media-permission (grant Photos access, then Index now): ${(t.message ?: "").take(120)}"
                         return Result.failure(Data.Builder().putString(OUT_ERROR, msg).build())
                     }
-                var indexed = 0
-                var done = 0
-                var pauseReason = PauseReason.OK
-                setProgress(Data.Builder().putInt(PROG_DONE, 0).putInt(PROG_TOTAL, pics.size).build())
-                for (p in pics) {
-                    if (isStopped) break
-                    val reason = pauseCheck()
-                    if (reason != PauseReason.OK) {
-                        pauseReason = reason
-                        break
-                    }
+                // PDFs are best-effort under the grant (may be invisible on 33+): honest 0 either way.
+                val pdfs =
                     try {
-                        indexOnePhoto(store, embedder, p)
-                        indexed++
-                    } catch (t: Throwable) {
-                        val msg = (t.message ?: t.javaClass.simpleName).take(160)
-                        Log.w(TAG, "index failed ${p.name}: $msg")
-                        store.upsertFile(p.uri.toString(), "image", -1L, p.dateModified, "failed", msg)
+                        MediaPdfs.list(applicationContext.contentResolver, maxFiles)
+                    } catch (t: SecurityException) {
+                        Log.w(TAG, "pdf sweep skipped: ${t.javaClass.simpleName}")
+                        emptyList()
                     }
-                    done++
-                    setProgress(Data.Builder().putInt(PROG_DONE, done).putInt(PROG_TOTAL, pics.size).build())
+                val buckets = runCatching { MediaPictures.listBuckets(applicationContext.contentResolver) }.getOrDefault(emptyList())
+                // Count only: bucket names are the user's own album names, never logged.
+                Log.i(TAG, "full-corpus buckets=${buckets.size} pics=${pics.size} pdfs=${pdfs.size}")
+                var imgIndexed = 0
+                var imgDone = 0
+                var pdfSegs = 0
+                var pdfDone = 0
+                var pauseReason = PauseReason.OK
+                suspend fun progress() {
+                    setProgress(
+                        Data.Builder()
+                            .putInt(PROG_DONE, imgDone + pdfDone)
+                            .putInt(PROG_TOTAL, pics.size + pdfs.size)
+                            .putInt(PROG_IMAGE_DONE, imgDone)
+                            .putInt(PROG_IMAGE_TOTAL, pics.size)
+                            .putInt(PROG_PDF_DONE, pdfDone)
+                            .putInt(PROG_PDF_TOTAL, pdfs.size)
+                            .build(),
+                    )
                 }
-                Log.i(TAG, "index-now done indexed=$indexed total=${pics.size} pause=$pauseReason")
+                progress()
+                for (range in FullCorpus.batchRanges(pics.size)) {
+                    for (i in range) {
+                        if (isStopped) break
+                        val reason = pauseCheck()
+                        if (reason != PauseReason.OK) {
+                            pauseReason = reason
+                            break
+                        }
+                        try {
+                            if (indexOnePhoto(store, embedder, pics[i])) imgIndexed++
+                        } catch (t: Throwable) {
+                            val msg = (t.message ?: t.javaClass.simpleName).take(160)
+                            Log.w(TAG, "index failed ${pics[i].name}: $msg")
+                            store.upsertFile(pics[i].uri.toString(), "image", -1L, pics[i].dateModified, "failed", msg)
+                        }
+                        imgDone++
+                    }
+                    progress()
+                    currentCoroutineContext().ensureActive()
+                    yield()
+                    if (pauseReason != PauseReason.OK || isStopped) break
+                }
+                if (pauseReason == PauseReason.OK && !isStopped) {
+                    MediaPdfs.ensureInit() // one native init per run; per-file calls after this are no-ops
+                    for (range in FullCorpus.batchRanges(pdfs.size)) {
+                        for (i in range) {
+                            if (isStopped) break
+                            val reason = pauseCheck()
+                            if (reason != PauseReason.OK) {
+                                pauseReason = reason
+                                break
+                            }
+                            try {
+                                pdfSegs += indexOnePdf(store, embedder, pdfs[i])
+                            } catch (t: Throwable) {
+                                val msg = (t.message ?: t.javaClass.simpleName).take(160)
+                                Log.w(TAG, "pdf index failed ${pdfs[i].name}: $msg")
+                                store.upsertFile(pdfs[i].uri.toString(), "pdf", -1L, pdfs[i].dateModified, "failed", msg)
+                            }
+                            pdfDone++
+                        }
+                        progress()
+                        currentCoroutineContext().ensureActive()
+                        yield()
+                        if (pauseReason != PauseReason.OK || isStopped) break
+                    }
+                }
+                Log.i(TAG, "index-now done photos=$imgIndexed/${pics.size} pdfSegs=$pdfSegs/${pdfs.size} pause=$pauseReason")
                 return Result.success(
                     Data.Builder()
-                        .putInt(OUT_INDEXED, indexed)
+                        .putInt(OUT_INDEXED, imgIndexed)
                         .putInt(OUT_TOTAL, pics.size)
+                        .putInt(OUT_PDF_INDEXED, pdfSegs)
+                        .putInt(OUT_PDF_TOTAL, pdfs.size)
+                        .putInt(OUT_PDF_FILES_DONE, pdfDone)
                         .putString(OUT_PAUSE_REASON, pauseReason.name)
                         .build(),
                 )
@@ -162,11 +228,16 @@ class IndexWorker(
         }
     }
 
+    /**
+     * One photo -> one image segment. Returns false for skipped/failed rows
+     * (no vector landed); the row is only written after a successful embed,
+     * so a failed run keeps the last good segments instead of a bare row.
+     */
     private fun indexOnePhoto(
         store: DeviceIndexStore,
         embedder: Embedder,
         p: PicRow,
-    ) {
+    ): Boolean {
         val jpeg = sampledJpeg(p) ?: throw IllegalStateException("undecodable image bytes")
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         applicationContext.contentResolver.openInputStream(p.uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
@@ -180,14 +251,52 @@ class IndexWorker(
                 HeicSupport.hasHeicDecoder(),
             )
         if (plan.skipReason != null) {
-            store.upsertFile(p.uri.toString(), if (shot) "screenshot" else "image", jpeg.size.toLong(), p.dateModified, "failed", plan.skipReason)
-            return
+            val id = store.upsertFile(p.uri.toString(), if (shot) "screenshot" else "image", jpeg.size.toLong(), p.dateModified, "failed", plan.skipReason)
+            store.clearSegments(id)
+            return false
         }
+        // Embed first: the row is only touched once bytes landed, so a failed
+        // embed keeps the last good segments for the retry (caller logs it).
         val vec = embedder.embedImage(jpeg)
+        val id = store.upsertFile(p.uri.toString(), if (shot) "screenshot" else "image", jpeg.size.toLong(), p.dateModified, "done")
+        store.clearSegments(id) // same row, fresh bytes, never stacked duplicates
         val kind = if (shot) "screenshot" else "image"
         // shortcut: single image segment per photo; filename doc-vector + OCR body text are F023 tuning.
-        val id = store.upsertFile(p.uri.toString(), kind, jpeg.size.toLong(), p.dateModified, "done")
         store.addSegment(id, kind, "image", p.name, fp16Bytes(vec), p.name, p.name, p.name)
+        return true
+    }
+
+    /**
+     * One PDF -> one kind=page segment per TEXT first-pass page (loc =
+     * 0-based page, FTS body = page text). Render-only/locked/scanned pages
+     * get the existing preview treatment (MediaPreview renders inline) and no
+     * vector here. The row is only written after the first embed lands, so a
+     * fully-failed run keeps the last good segments. Returns the TEXT segment
+     * count.
+     */
+    private fun indexOnePdf(
+        store: DeviceIndexStore,
+        embedder: Embedder,
+        row: PdfRow,
+    ): Int {
+        val texts = MediaPdfs.readFirstPassTexts(applicationContext, row.uri)
+        if (texts.isEmpty()) {
+            store.upsertFile(row.uri.toString(), "pdf", row.size, row.dateModified, "done", "no-text-layer")
+            return 0
+        }
+        var n = 0
+        var fileId: Long? = null
+        for ((page, text) in texts.withIndex()) {
+            val plan = FullCorpus.pdfPagePlan(page, text) ?: continue
+            // Embed first, same as photos: the row is only touched once bytes
+            // landed, so failed embeds keep the last good segments for retry.
+            val vec = runCatching { embedder.embedDocs(listOf(row.name to plan.body)).single() }.getOrNull() ?: continue
+            val fid = fileId ?: store.upsertFile(row.uri.toString(), "pdf", row.size, row.dateModified, "done").also { fileId = it; store.clearSegments(it) }
+            store.addSegment(fid, "page", "text", plan.body.take(600), fp16Bytes(vec), row.name, plan.body, row.name, loc = page.toDouble())
+            n++
+        }
+        if (n == 0) store.upsertFile(row.uri.toString(), "pdf", row.size, row.dateModified, "done", "render-only ${texts.size} pages")
+        return n
     }
 
     /** Downsamples to a 1024-longest-side JPEG for the vision encoder (never upscales). */
@@ -229,7 +338,7 @@ class IndexWorker(
         const val MODE_CRAWL = "crawl"
         const val MODE_INDEX_NOW = "index_now"
 
-        /** First-corpus cap (F022: Pictures only, newest first). */
+        /** Optional per-run bound (tests pass 2); production sends none — the corpus is unbound. */
         const val IN_MAX_FILES = "maxFiles"
 
         /** Unique work name the status sheet observes. */
@@ -238,8 +347,18 @@ class IndexWorker(
         /** Live progress keys (setProgress) + terminal output keys. */
         const val PROG_DONE = "done"
         const val PROG_TOTAL = "total"
+
+        /** Per-kind live progress for the image+pdf status rows. */
+        const val PROG_IMAGE_DONE = "imageDone"
+        const val PROG_IMAGE_TOTAL = "imageTotal"
+        const val PROG_PDF_DONE = "pdfDone"
+        const val PROG_PDF_TOTAL = "pdfTotal"
         const val OUT_INDEXED = "indexed"
         const val OUT_TOTAL = "total"
+        const val OUT_PDF_INDEXED = "pdfIndexed"
+        const val OUT_PDF_TOTAL = "pdfTotal"
+        /** PDF files walked (units = files). OUT_PDF_INDEXED counts segments — never mix them. */
+        const val OUT_PDF_FILES_DONE = "pdfFilesDone"
         const val OUT_ERROR = "error"
 
         /**

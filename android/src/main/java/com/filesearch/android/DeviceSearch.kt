@@ -19,6 +19,8 @@ data class StoredSeg(
     val excerpt: String?,
     val vec: ByteArray?,
     val ftsName: String,
+    /** Page index (pdf) or seconds (audio/frame); 0.0 when meaningless. */
+    val loc: Double = 0.0,
 )
 
 /** Ranked rows: strong stay visible, weak fold under "weaker matches". */
@@ -118,7 +120,7 @@ object DeviceSearch {
             fileName = ftsName.ifEmpty { path.substringAfterLast('/') },
             kind = kind,
             excerpt = markExcerpt(text, findRanges(text, terms)),
-            locLabel = formatLoc(kind, 0.0),
+            locLabel = formatLoc(kind, loc),
             thumbKey = "$kind:$id",
             fileUri = path,
         )
@@ -129,8 +131,7 @@ object DeviceSearch {
      * empty index) -> embed (throws when the model is missing — the host
      * catches and keeps old rows) -> per-term FTS coverage -> fuse.
      * Runs off Main: LiteRT is single-flight behind its own mutex, DB behind
-     * the store lock. Reads the whole corpus (brute force, like the engine);
-     * the F022 corpus is <= 200 photos.
+     * the store lock. Reads the whole corpus (brute force, like the engine).
      */
     fun search(
         query: String,

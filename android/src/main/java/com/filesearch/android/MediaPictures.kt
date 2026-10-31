@@ -13,16 +13,16 @@ data class PicRow(
 )
 
 /**
- * F022 first corpus: phone Pictures via MediaStore (read-only).
- * Newest first, capped — the SAF folder picker + persisted permissions land in
- * F023.
- *
- * // shortcut: no SAF picker yet (F023); corpus is Pictures-only, capped at 50.
+ * F025 full corpus: ALL MediaStore Images buckets (DCIM, Pictures,
+ * Screenshots, WhatsApp Images, Download, …), newest first, unbound — the
+ * F022 Pictures-only cap-50 slice is gone. Workers commit in per-50 batches
+ * (progress + watchdog-friendly yields) so RSS stays sane. The SAF folder
+ * picker + persisted permissions stay F023.
  */
 object MediaPictures {
     fun list(
         resolver: ContentResolver,
-        limit: Int = 50,
+        limit: Int = Int.MAX_VALUE,
     ): List<PicRow> {
         val cols =
             arrayOf(
@@ -55,6 +55,26 @@ object MediaPictures {
                     )
                 }
             }
+        }
+        return emptyList()
+    }
+
+    /**
+     * Distinct bucket names across the whole Images collection — probed, never
+     * hardcoded — so the status sheet can report which buckets were covered.
+     * Single-column cursor, streamed: cheap next to the photo sweep itself.
+     */
+    fun listBuckets(resolver: ContentResolver): List<String> {
+        val cols = arrayOf(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+        resolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            cols,
+            null,
+            null,
+            null,
+        )?.use { c ->
+            val bucketCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+            return FullCorpus.distinctBuckets(buildList { while (c.moveToNext()) add(c.getString(bucketCol)) })
         }
         return emptyList()
     }

@@ -82,7 +82,7 @@ class DeviceIndexStore(ctx: Context) : AutoCloseable {
         }
     }
 
-    /** Inserts the segment plus its FTS row (rowid = segment id) in one txn. */
+    /** Inserts the segment plus its FTS row (rowid = segment id) in one txn. loc = page/seconds (arch §5), null when meaningless. */
     @Synchronized
     fun addSegment(
         fileId: Long,
@@ -93,17 +93,21 @@ class DeviceIndexStore(ctx: Context) : AutoCloseable {
         name: String,
         body: String,
         original: String,
+        loc: Double? = null,
+        locEnd: Double? = null,
     ): Long {
         exec("BEGIN IMMEDIATE")
         try {
             conn.prepare(
-                "INSERT INTO segments(file_id,kind,modality,excerpt,vec) VALUES (?,?,?,?,?)",
+                "INSERT INTO segments(file_id,kind,modality,loc,loc_end,excerpt,vec) VALUES (?,?,?,?,?,?,?)",
             ).use { ins ->
                 ins.bindLong(1, fileId)
                 ins.bindText(2, kind)
                 ins.bindText(3, modality)
-                if (excerpt != null) ins.bindText(4, excerpt) else ins.bindNull(4)
-                if (vec != null) ins.bindBlob(5, vec) else ins.bindNull(5)
+                if (loc != null) ins.bindDouble(4, loc) else ins.bindNull(4)
+                if (locEnd != null) ins.bindDouble(5, locEnd) else ins.bindNull(5)
+                if (excerpt != null) ins.bindText(6, excerpt) else ins.bindNull(6)
+                if (vec != null) ins.bindBlob(7, vec) else ins.bindNull(7)
                 ins.step()
             }
             val segId =
@@ -137,11 +141,10 @@ class DeviceIndexStore(ctx: Context) : AutoCloseable {
     }
 
     /** All segments + file path + FTS name for the query path (F024 brute-force read). */
-    // shortcut: loc/loc_end not selected, so formatLoc hardcodes 0.0 (photos only) — select+store when pdf/audio land (F023+).
     @Synchronized
     fun readSegments(): List<StoredSeg> {
         conn.prepare(
-            "SELECT s.id, f.path, s.kind, s.modality, s.excerpt, s.vec, fts.name " +
+            "SELECT s.id, f.path, s.kind, s.modality, s.excerpt, s.vec, fts.name, s.loc " +
                 "FROM segments s JOIN files f ON s.file_id = f.id LEFT JOIN fts ON fts.rowid = s.id",
         ).use { q ->
             return buildList {
@@ -155,6 +158,7 @@ class DeviceIndexStore(ctx: Context) : AutoCloseable {
                             excerpt = if (q.isNull(4)) null else q.getText(4),
                             vec = if (q.isNull(5)) null else q.getBlob(5),
                             ftsName = if (q.isNull(6)) "" else q.getText(6),
+                            loc = if (q.isNull(7)) 0.0 else q.getDouble(7),
                         ),
                     )
                 }
@@ -174,6 +178,31 @@ class DeviceIndexStore(ctx: Context) : AutoCloseable {
             q.bindLong(1, fileId)
             q.step()
             return q.getLong(0).toInt()
+        }
+    }
+
+    /**
+     * Drops a file's segments + FTS rows (re-embed after the bytes changed;
+     * the file row itself stays, so state/detail continuity holds). Keeps
+     * re-runs from stacking duplicate segments — the run-everything path
+     * re-embeds, but never double-counts.
+     */
+    @Synchronized
+    fun clearSegments(fileId: Long) {
+        exec("BEGIN IMMEDIATE")
+        try {
+            conn.prepare("DELETE FROM fts WHERE rowid IN (SELECT id FROM segments WHERE file_id=?)").use { q ->
+                q.bindLong(1, fileId)
+                q.step()
+            }
+            conn.prepare("DELETE FROM segments WHERE file_id=?").use { q ->
+                q.bindLong(1, fileId)
+                q.step()
+            }
+            exec("COMMIT")
+        } catch (t: Throwable) {
+            runCatching { exec("ROLLBACK") }
+            throw t
         }
     }
 

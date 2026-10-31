@@ -72,7 +72,7 @@ dependencies {
     // Promoted to implementation for inline PDF first-page preview (MediaPreview);
     // same artifact the review flagged "promote back when production lands".
     implementation("com.github.axet:pdfium:2.0.16")
-    androidTestImplementation("com.google.mlkit:text-recognition:16.0.1") // Latin OCR, bundled model
+    implementation("com.google.mlkit:text-recognition:16.0.1") // Latin OCR, bundled model
     androidTestImplementation("androidx.media3:media3-transformer:1.4.1")
     androidTestImplementation("androidx.media3:media3-extractor:1.4.1")
     // Inline audio preview (MediaPreview + MainActivity player): in-tab only,

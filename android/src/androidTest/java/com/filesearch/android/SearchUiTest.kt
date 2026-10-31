@@ -89,6 +89,48 @@ class SearchUiTest {
     }
 
     @Test
+    fun thumbTapExpandsPreview() {
+        // Regression: tapping a result thumbnail must expand the inline
+        // preview in-tab ("Read aloud" + "Open file"). Paparazzi snapshots
+        // set expandedKey directly and bypass the tap handler, so only a
+        // click-through test guards this path. Mirrors MainActivity wiring.
+        val image =
+            SearchRowUi(
+                fileName = "beach-day.jpg",
+                kind = "image",
+                excerpt = "a «beach» sunset",
+                locLabel = "",
+                thumbKey = "image:2",
+            )
+        val previewKey = mutableStateOf<String?>(null)
+        compose.setContent {
+            SearchScreenContent(
+                query = "beach",
+                onQueryChange = {},
+                visibleRows = listOf(image),
+                weakCount = 0,
+                expanded = false,
+                onToggleExpanded = {},
+                listening = false,
+                onMicClick = {},
+                onSpeakClick = {},
+                onOpenResult = {},
+                expandedKey = previewKey.value,
+                onPreviewToggle = { row ->
+                    previewKey.value = if (previewKey.value == row.thumbKey) null else row.thumbKey
+                },
+            )
+        }
+        compose.onNodeWithTag("thumb_image:2").performClick()
+        compose.onNodeWithTag("preview_image:2").assertIsDisplayed()
+        compose.onNodeWithText("Read aloud").assertIsDisplayed()
+        compose.onNodeWithText("Open file").assertIsDisplayed()
+        // Second tap collapses back to the bare tile.
+        compose.onNodeWithTag("thumb_image:2").performClick()
+        compose.onAllNodesWithTag("preview_image:2").assertCountEquals(0)
+    }
+
+    @Test
     fun settingsTogglesDefaultOff() {
         compose.setContent {
             SettingsScreenContent(

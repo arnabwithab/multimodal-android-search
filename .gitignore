@@ -4,3 +4,4 @@ app/build/
 __pycache__/
 docs/bench/last-*.json
 .kotlin/
+android/.attach_pid*

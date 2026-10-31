@@ -6,10 +6,9 @@
   <img src="https://img.shields.io/github/actions/workflow/status/arnabwithab/multimodal-android-search/ci.yml?branch=main" alt="build status"/>
   <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="version"/>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license"/>
-  <img src="https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin"/>
-  <img src="https://img.shields.io/badge/Jetpack_Compose-4285F4?logo=jetpackcompose&logoColor=white" alt="Jetpack Compose"/>
-  <img src="https://img.shields.io/badge/LiteRT_LM-FF6F00" alt="LiteRT-LM"/>
-  <img src="https://img.shields.io/badge/Room_•_SQLite-003B57?logo=sqlite&logoColor=white" alt="Room SQLite"/>
+  <img src="https://img.shields.io/badge/Kotlin-2.3.21-7F52FF?logo=kotlin&logoColor=white" alt="Kotlin"/>
+  <img src="https://img.shields.io/badge/LiteRT_LM-0.18.0-FF6F00" alt="LiteRT-LM"/>
+  <img src="https://img.shields.io/badge/EmbeddingGemma-2_%26_300M-FFD21F?logo=huggingface&logoColor=black" alt="EmbeddingGemma"/>
 </p>
 
 ## What this is

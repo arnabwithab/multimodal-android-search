@@ -15,10 +15,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,10 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.work.Data
@@ -588,21 +581,19 @@ class MainActivity : ComponentActivity() {
                 )
             },
             status = {
-                // F022: Index-now lives here until the sibling adds the StatusSheet onIndexNow callback.
-                Column {
-                    Button(onClick = { enqueueIndexNow() }, modifier = Modifier.testTag("indexNowButton")) {
-                        Text("Index now")
-                    }
-                    Text(indexState, modifier = Modifier.padding(top = 4.dp))
-                    StatusSheetContent(
-                        progress = kindProgress,
-                        remainingLabel = remainingLabel,
-                        paused = paused,
-                        pauseLabel = pauseLabel,
-                        onPauseToggle = { togglePause() },
-                        onDismiss = { tab = 0 },
-                    )
-                }
+                // Running flag derives from the existing poll state (no new
+                // remembered state); the sheet owns button + progress together.
+                val indexingRunning = indexState == "indexing…" || indexState == "starting…"
+                StatusSheetContent(
+                    progress = kindProgress,
+                    remainingLabel = remainingLabel,
+                    paused = paused,
+                    pauseLabel = pauseLabel,
+                    indexing = indexingRunning,
+                    onIndexNow = { enqueueIndexNow() },
+                    onPauseToggle = { togglePause() },
+                    onDismiss = { tab = 0 },
+                )
             },
             settings = {
                 SettingsScreenContent(

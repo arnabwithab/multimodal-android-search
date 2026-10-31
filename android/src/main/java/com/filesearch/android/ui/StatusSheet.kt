@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -13,8 +14,10 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -40,6 +43,12 @@ import androidx.compose.ui.unit.dp
  * Stock M3 Scaffold + TopAppBar: the Scaffold's Surface supplies the content
  * color (a bare Column left heading text black-on-dark); Pause stays the one
  * primary action, Close is text.
+ *
+ * The Index-now button lives here (not above the sheet) so it and the
+ * progress rows can't disagree: while [indexing] it is disabled and shows a
+ * spinner + "Indexing…" instead of a separate tap target; the per-kind rows
+ * plus [remainingLabel] already carry the exact counts, so no standalone
+ * status line is rendered. When idle it is a normal "Index now" button.
  */
 
 /** One per-kind progress line; engine supplies done/total counts. */
@@ -58,17 +67,35 @@ fun StatusSheetContent(
     pauseLabel: String?,
     onPauseToggle: () -> Unit,
     onDismiss: () -> Unit,
+    indexing: Boolean = false,
+    onIndexNow: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     FileSearchTheme {
         Scaffold(
-            // Wrap height (no fillMaxSize): the device host embeds this in a
-            // plain Column under its own button, so full-height would push
-            // siblings off-screen; width fill keeps the sheet edge-to-edge.
+            // Wrap height (no fillMaxSize): this renders as tab content on
+            // device, so full-height would push siblings off-screen; width
+            // fill keeps the sheet edge-to-edge.
             modifier = modifier.fillMaxWidth().testTag("statusSheet"),
             topBar = { TopAppBar(title = { Text("Indexing status") }) },
         ) { padding ->
             Column(modifier = Modifier.padding(padding).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+                // The button IS the running state: disabled + spinner while
+                // indexing, plain "Index now" when idle. Counts live in the
+                // rows + remainingLabel below — no separate status line.
+                Button(
+                    onClick = onIndexNow,
+                    enabled = !indexing,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("indexNowButton"),
+                ) {
+                    if (indexing) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Indexing…")
+                    } else {
+                        Text("Index now")
+                    }
+                }
                 progress.forEach { line ->
                     val fraction =
                         if (line.total <= 0) 0f else (line.done.toFloat() / line.total).coerceIn(0f, 1f)

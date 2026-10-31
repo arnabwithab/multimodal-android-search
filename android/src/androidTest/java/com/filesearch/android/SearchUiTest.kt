@@ -1,9 +1,11 @@
 package com.filesearch.android
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -60,7 +62,8 @@ class SearchUiTest {
         }
         compose.onNodeWithText("sleep-study.pdf").assertIsDisplayed()
         compose.onNodeWithText("weaker matches (1)").assertIsDisplayed()
-        compose.onNodeWithText("beach-day.jpg").assertDoesNotExist()
+        // Image rows render no filename — the thumb tag proves the weak row is hidden.
+        compose.onAllNodesWithTag("thumb_img:2").assertCountEquals(0)
     }
 
     @Test
@@ -81,7 +84,8 @@ class SearchUiTest {
             )
         }
         compose.onNodeWithTag("weakFold").performClick()
-        compose.onNodeWithText("beach-day.jpg").assertIsDisplayed()
+        // Image rows ARE the thumbnail — no filename text renders.
+        compose.onNodeWithTag("thumb_img:2").assertIsDisplayed()
     }
 
     @Test

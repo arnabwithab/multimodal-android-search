@@ -4,21 +4,23 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -45,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -66,7 +69,9 @@ import com.filesearch.android.VoiceService
  * // when the build allows it (same story as android/PowerPolicy.kt).
  */
 
-/** Display-ready row: excerpt already «marked», locLabel already formatted by engine. */
+/** Display-ready row: locLabel/excerpt still arrive engine-formatted (engine «match»
+ * marking + TTS/open plumbing untouched) but rows render per-kind with no text
+ * clutter — excerpt is never shown. */
 data class SearchRowUi(
     val fileName: String,
     val kind: String,
@@ -236,6 +241,16 @@ fun SearchScreenContent(
     }
 }
 
+/**
+ * Per-kind minimal row (user verdict — no text clutter anywhere, no excerpt):
+ * image/video rows ARE the thumbnail (full-bleed, tap expands the preview in
+ * place); audio rows ARE the player (play/pause + audio icon + progress, no
+ * filename); pdf/text rows are icon + filename only (pdf tap expands its
+ * preview pane). Weak-fold/match-count behaviour is engine-side, unchanged.
+ * [onSpeakClick]/[onOpenResult] are secondary actions inside the expanded
+ * preview (never row clutter): "Read aloud" + "Open file" sit below
+ * MediaPreview(...) only when expanded.
+ */
 @Composable
 private fun ResultRow(
     row: SearchRowUi,
@@ -250,79 +265,100 @@ private fun ResultRow(
     pdfPreview: PdfPreviewData? = null,
 ) {
     // Stock Card defaults: M3 picks container/shape, content color inherited.
+    // Device loaders stay unconditional (hook-stability: never call a
+    // remember/LaunchedEffect composable from a conditional branch); the
+    // injected snapshot [pdfPreview] still wins when present.
     Card(modifier = modifier.fillMaxWidth()) {
-        // Sampled thumb loaded once per row (device decodes off-Main in the
-        // loader; Paparazzi/inspection returns null -> letter tile). The PDF
-        // first page loads unconditionally (hook-stability: never call a
-        // remember/LaunchedEffect composable from a conditional branch); the
-        // injected snapshot [pdfPreview] still wins when present.
         val loadedThumb = rememberImageThumb(row.fileUri)
         val loadedPdf = rememberPdfFirstPage(row.fileUri)
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Thumb tile: real sampled bitmap on device, letter tile while
-                // loading/on failure (BitmapFactory sampling — no new dep).
-                // Tapping expands the row inline; never navigates.
-                ThumbTile(
-                    kind = row.kind,
-                    thumb = loadedThumb,
-                    contentDescription = row.fileName,
-                    modifier = Modifier.testTag("thumb_${row.thumbKey}").clickable(role = Role.Button, onClick = onThumbClick),
+        when (row.kind) {
+            "image", "video" -> {
+                // Gallery feel: the image IS the row — no filename, no badge,
+                // no loc. Tapping expands the preview inline, never navigates.
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .testTag("thumb_${row.thumbKey}").clickable(role = Role.Button, onClick = onThumbClick),
+                ) {
+                    if (loadedThumb != null) {
+                        Image(
+                            loadedThumb,
+                            contentDescription = row.fileName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxWidth().height(220.dp),
+                        )
+                    } else {
+                        // Deterministic loading tile (device decodes off-Main;
+                        // Paparazzi/inspection returns null -> letter tile).
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxWidth().height(220.dp),
+                        ) {
+                            ThumbTile(kind = row.kind, thumb = null, contentDescription = null)
+                        }
+                    }
+                }
+            }
+            "audio" -> {
+                // The row IS the player — play/pause + audio icon + progress.
+                AudioInlineRow(
+                    fileName = row.fileName,
+                    isPlaying = audioIsPlaying,
+                    progress = audioProgress,
+                    onToggle = onAudioToggle,
+                    modifier = Modifier.padding(12.dp),
                 )
-                Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            }
+            else -> {
+                // Filename + icon ONLY. Only pdf expands (preview pane stays);
+                // other kinds have no preview to show.
+                val expandable = row.kind == "pdf"
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(12.dp)
+                        .testTag("thumb_${row.thumbKey}")
+                        .then(if (expandable) Modifier.clickable(role = Role.Button, onClick = onThumbClick) else Modifier),
+                ) {
+                    Icon(Icons.Filled.Description, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         row.fileName,
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    // One meta line (kind + location) instead of two custom pills.
-                    val meta =
-                        listOf(row.kind, row.locLabel).filter { it.isNotEmpty() }.joinToString(" • ")
-                    if (meta.isNotEmpty()) {
-                        Text(
-                            meta,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    // Engine-marked «match» excerpt, shown verbatim.
-                    Text(
-                        row.excerpt,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                Column {
-                    IconButton(onClick = onSpeakClick) {
-                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Read excerpt aloud")
-                    }
-                    IconButton(onClick = onOpenResult) {
-                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open result")
-                    }
                 }
             }
-            // Inline expansion: preview lives inside the row, in the Search tab.
-            if (isExpanded) {
-                val pdf = pdfPreview ?: loadedPdf
-                MediaPreview(
-                    row = row,
-                    imageThumb =
-                        if (row.kind == "image" || row.kind == "video") {
-                            loadedThumb
-                        } else {
-                            null
-                        },
-                    pdf = pdf,
-                    audioIsPlaying = audioIsPlaying,
-                    audioProgress = audioProgress,
-                    onAudioToggle = onAudioToggle,
-                    modifier = Modifier.testTag("preview_${row.thumbKey}"),
-                )
+        }
+        // Inline expansion: preview lives inside the row, in the Search tab.
+        // Audio needs none — the row already is the player. Text has no pane.
+        if (isExpanded && (row.kind == "image" || row.kind == "video" || row.kind == "pdf")) {
+            val pdf = pdfPreview ?: loadedPdf
+            MediaPreview(
+                row = row,
+                imageThumb =
+                    if (row.kind == "image" || row.kind == "video") {
+                        loadedThumb
+                    } else {
+                        null
+                    },
+                pdf = pdf,
+                audioIsPlaying = audioIsPlaying,
+                audioProgress = audioProgress,
+                onAudioToggle = onAudioToggle,
+                modifier = Modifier.testTag("preview_${row.thumbKey}"),
+            )
+            // Secondary actions: stranded speak/open callbacks re-surfaced
+            // here (never row clutter) — stock TextButtons, host-owned.
+            Row(
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            ) {
+                TextButton(onClick = onSpeakClick, modifier = Modifier.testTag("speak_${row.thumbKey}")) {
+                    Text("Read aloud")
+                }
+                TextButton(onClick = onOpenResult, modifier = Modifier.testTag("open_${row.thumbKey}")) {
+                    Text("Open file")
+                }
             }
         }
     }

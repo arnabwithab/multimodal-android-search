@@ -293,9 +293,11 @@ fun AudioInlineRow(
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // No filename rendered (user verdict) — fileName only feeds the toggle's
+    // accessibility description.
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.fillMaxWidth().padding(top = 8.dp),
+        modifier = modifier.fillMaxWidth(),
     ) {
         IconButton(onClick = onToggle, modifier = Modifier.testTag("audioToggle")) {
             Icon(
@@ -303,30 +305,20 @@ fun AudioInlineRow(
                 contentDescription = if (isPlaying) "Pause $fileName" else "Play $fileName",
             )
         }
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Audiotrack, contentDescription = null, modifier = Modifier.size(16.dp))
-                Text(
-                    fileName,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 4.dp),
-                )
-            }
-            LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag("audioProgress"),
-            )
-        }
+        Icon(Icons.Filled.Audiotrack, contentDescription = null, modifier = Modifier.size(20.dp))
+        LinearProgressIndicator(
+            progress = { progress.coerceIn(0f, 1f) },
+            modifier = Modifier.weight(1f).padding(start = 12.dp).testTag("audioProgress"),
+        )
     }
 }
 
 /**
  * Expanded inline preview for one row. Image/video show the (sampled) bitmap
  * or its loading tile; PDFs show text-or-render via the >=200-char rule; audio
- * shows play/pause + progress. The row's viewer icon stays the only external
- * affordance — expansion never navigates.
+ * and text rows show none — audio already is the player, and excerpts are
+ * never rendered (no text clutter). The row stays the only affordance —
+ * expansion never navigates.
  */
 @Composable
 fun MediaPreview(
@@ -358,20 +350,8 @@ fun MediaPreview(
                 }
             }
             "pdf" -> PdfPreviewPane(pdf)
-            "audio" ->
-                AudioInlineRow(
-                    fileName = row.fileName,
-                    isPlaying = audioIsPlaying,
-                    progress = audioProgress,
-                    onToggle = onAudioToggle,
-                )
-            else -> {
-                Text(
-                    row.excerpt,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
+            // audio/text: nothing — player/filename already in the row.
+            else -> Unit
         }
     }
 }

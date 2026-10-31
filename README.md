@@ -15,9 +15,21 @@
 ## What this is
 
 An Android-native port of DigUp: pick folders, it indexes what's *in* your files with EmbeddingGemma 2 (LiteRT-LM, on-device), then finds them from a plain description, in any language.
-## Status
 
-Pre-implementation. Feature tracker: `docs/features.json`.
+## How to run it
+
+```bash
+make setup   # JDK + Android SDK + hooks; safe to re-run
+make test    # JVM unit tests, Linux-safe CI gate
+make dev     # install debug APK on attached device + logcat
+make eval    # ranking evals on Linux (evals/*.json)
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+
+## Privacy
+
+Everything stays on your phone. Nothing leaves the device except the one-time model download and the voice API you explicitly opt into (STT/TTS, both OFF by default). Voice keys live in EncryptedSharedPreferences and are never logged.
 
 ## Acknowledgements
 
